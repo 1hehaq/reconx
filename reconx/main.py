@@ -176,9 +176,9 @@ class ReconX:
         self.ports_tree.column("Ports", width=150, anchor="center")
         self.ports_tree.pack(side="right", fill="both")
 
-
         self.services_tree = ttk.Treeview(self.port_services_tabview.tab("Services"), columns=("Services"), show="headings", style="Treeview")
         self.services_tree.heading("Services", text="Services")
+        self.services_tree.column("Services", anchor="center")
 
         # Optional: Set column widths
         self.services_tree.column("Services", width=150)
