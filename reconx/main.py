@@ -30,7 +30,7 @@ class ReconX:
         # Add window icon (add this after window creation)
         icon_photo = tk.PhotoImage(file="icons/logo.png")
         self.window.iconphoto(False, icon_photo)
-        #self.window.resizable(False, False)
+        self.window.resizable(False, False)
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
