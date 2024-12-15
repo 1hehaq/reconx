@@ -114,7 +114,7 @@ class ReconX:
                                       bg_color="#000000", fg_color="#000000")
         self.menu.pack(side=ctk.RIGHT, padx=10, pady=10)
 
-        self.tabview = ctk.CTkTabview(self.frame_top, width=760, height=360, text_color="white", fg_color="transparent", 
+        self.tabview = ctk.CTkTabview(self.frame_top, width=760, height=360, text_color="white", fg_color="#000000", 
                                       border_width=0, corner_radius=0, segmented_button_selected_color="#000000", segmented_button_selected_hover_color="#000000", segmented_button_unselected_color="#000000", 
                                       segmented_button_unselected_hover_color="#000000")
         self.tabview.pack(side=ctk.LEFT, padx=10, pady=10)
