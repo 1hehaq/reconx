@@ -1,0 +1,9 @@
+customtkinter
+Ctkmenubar	
+tk
+pillow
+requests
+colorama
+ipwhois
+bs4
+whois

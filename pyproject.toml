@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "reconx"
+version = "1.0"
+description = "ReconX is a powerful and user-friendly reconnaissance tool designed for security researchers and penetration testers. It provides a comprehensive suite of features for gathering information about target domains through an intuitive graphical interface."
+authors = ["c0d3ninja"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.13"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
