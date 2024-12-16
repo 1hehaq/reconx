@@ -1,5 +1,4 @@
 from tkinter import messagebox, ttk
-from bs4 import BeautifulSoup
 from PIL import Image
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from colorama import Fore
@@ -17,13 +16,15 @@ import socket
 import tkinter as tk
 import re
 import whois
+import json
+from datetime import datetime
 
 requests.packages.urllib3.disable_warnings()
 
 class ReconX:
     def __init__(self):
         self.window = ctk.CTk()
-        self.window.title("ReconX")
+        self.window.title("ReconX v1.1")
         self.window.geometry("1025x575")
         self.window.configure(bg="#000000")
         self.window.configure(fg_color="#000000")
@@ -61,7 +62,7 @@ class ReconX:
         self.menu_frame.pack(side=ctk.TOP, padx=10, pady=10)
 
         self.settings_frame = ctk.CTkFrame(self.window, width=750, height=360, border_width=1, border_color="white", fg_color="#000000")
-        self.settings_frame.pack(side=ctk.LEFT, padx=10, pady=10, fill="both", expand=True)
+        self.settings_frame.pack(side=ctk.TOP, padx=10, pady=10, fill="both", expand=True)
         self.settings_frame.grid_propagate(False)
 
         self.progress_bar = ctk.CTkProgressBar(self.frame_top, width=700, height=7, corner_radius=10)
@@ -102,7 +103,6 @@ class ReconX:
         self.clear_button.pack(side=ctk.RIGHT, padx=10, pady=10)
 
 
-
         self.waiting_frames = ["Waiting for input", "Waiting for input.", "Waiting for input..", "Waiting for input..."]
         self.current_frame = 0
         self.animate_waiting()
@@ -119,6 +119,7 @@ class ReconX:
                                       segmented_button_unselected_hover_color="#000000")
         self.tabview.pack(side=ctk.LEFT, padx=10, pady=10)
         self.tabview.add("Home")
+        self.tabview.add("Settings")
         self.tabview.add("Subdomains")
         self.tabview.add("ASN")
         self.tabview.add("Headers")
@@ -126,7 +127,6 @@ class ReconX:
         self.tabview.add("JavaScript")
         self.tabview.add("Whois")
         self.tabview._segmented_button.configure(border_width=0, fg_color="#000000", text_color="#000000")
-
 
         self.port_services_tabview = ctk.CTkTabview(self.settings_frame, width=200, height=500, text_color="white", fg_color="#000000")
         self.port_services_tabview.pack(side=ctk.TOP, padx=10, pady=10)
@@ -146,8 +146,39 @@ class ReconX:
         self.home_label = ctk.CTkLabel(self.tabview.tab("Home"), text="WELCOME TO RECONX", font=("Arial", 25), text_color="white")
         self.home_label.pack(side=ctk.TOP, padx=10, pady=10)
 
-        self.home_label = ctk.CTkLabel(self.tabview.tab("Home"), text="v1.0", font=("Arial", 25), text_color="white")
-        self.home_label.pack(side=ctk.TOP, padx=10, pady=10)
+        # Thread Settings
+        self.thread_settings_frame = ctk.CTkFrame(self.tabview.tab("Settings"), fg_color="#000000")
+        self.thread_settings_frame.pack(side=ctk.TOP, fill="x", padx=10, pady=5)
+
+        self.thread_controls_frame = ctk.CTkFrame(self.thread_settings_frame, fg_color="#000000")
+        self.thread_controls_frame.pack(side=ctk.TOP, padx=5, pady=5)
+
+        self.proxy_controls_frame = ctk.CTkFrame(self.thread_settings_frame, fg_color="#000000")
+        self.proxy_controls_frame.pack(side=ctk.TOP, padx=5, pady=5)
+
+        proxy_label = ctk.CTkLabel(self.proxy_controls_frame, text="Proxy:", text_color="white")
+        proxy_label.pack(side=ctk.LEFT, padx=27)
+        self.proxy_entry = ctk.CTkEntry(self.proxy_controls_frame, width=125, height=25, fg_color="#000000")
+        self.proxy_entry.pack(side=ctk.LEFT, padx=27)
+
+
+        # Add save results checkbox
+        self.save_results_var = ctk.BooleanVar(value=False)
+        self.save_results_checkbox = ctk.CTkCheckBox(
+            self.thread_settings_frame,
+            text="Save Results",
+            variable=self.save_results_var,
+            text_color="white",
+            fg_color="#14375e",
+            hover_color="#1c4b7e"
+        )
+        self.save_results_checkbox.pack(side=ctk.TOP, padx=10, pady=5)
+
+        self.thread_label = ctk.CTkLabel(self.thread_controls_frame, text="Max Threads:", text_color="white")
+        self.thread_label.pack(side=ctk.LEFT, padx=5)
+        self.thread_entry = ctk.CTkEntry(self.thread_controls_frame, width=125, height=25, fg_color="#000000")
+        self.thread_entry.insert(0, "10")  # Default threads
+        self.thread_entry.pack(side=ctk.LEFT, padx=5)
 
         
         
@@ -253,6 +284,12 @@ class ReconX:
         self.home_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.home_image, 
                                                corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Home"))
         self.home_button.pack(side=ctk.LEFT, padx=10, pady=10)
+
+
+        self.settings_image = ctk.CTkImage(Image.open("icons/settings.png"), size=(30, 30)) 
+        self.settings_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.settings_image, 
+                                               corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Settings"))
+        self.settings_button.pack(side=ctk.LEFT, padx=10, pady=10)
 
 
         self.subdomains_image = ctk.CTkImage(Image.open("icons/domains.png"), size=(30, 30)) 
@@ -496,7 +533,8 @@ class ReconX:
 
                 self.progress_label.configure(text=f"Processing 0/{total_items} WHOIS entries...")
 
-                with ThreadPoolExecutor(max_workers=10) as executor:
+                max_threads = int(self.thread_entry.get())
+                with ThreadPoolExecutor(max_workers=max_threads) as executor:
                     future_to_data = {
                         executor.submit(self.process_whois_data, key, value): (key, value)
                         for key, value in filtered_data.items()
@@ -519,6 +557,7 @@ class ReconX:
                         except Exception as e:
                             print(f"Error processing future: {e}")
 
+                self.save_scan_results("whois", None)
                 self.progress_bar.stop()
                 self.progress_label.configure(text=f"Done! Found {len(self.whois_tree.get_children())} WHOIS entries")
 
@@ -575,7 +614,8 @@ class ReconX:
                 processed = 0
                 self.progress_label.configure(text=f"Processing 0/{total_links} links...")
 
-                with ThreadPoolExecutor(max_workers=10) as executor:
+                max_threads = int(self.thread_entry.get()) 
+                with ThreadPoolExecutor(max_workers=max_threads) as executor:
                     future_to_link = {
                         executor.submit(self.process_link, link): link 
                         for link in links
@@ -594,6 +634,7 @@ class ReconX:
                         if result:
                             self.links_tree.insert("", "end", values=(result,))
 
+                self.save_scan_results("links", None)
                 self.progress_bar.stop()
                 self.progress_label.configure(text=f"Done! Found {len(self.links_tree.get_children())} links")
 
@@ -668,7 +709,8 @@ class ReconX:
             # Download JavaScript files concurrently
             try:
                 self.start_scan()
-                with ThreadPoolExecutor(max_workers=10) as executor:
+                max_threads = int(self.thread_entry.get())
+                with ThreadPoolExecutor(max_workers=max_threads) as executor:
                     future_to_script = {
                         executor.submit(self.download_script, url, script): script
                         for script in scripts
@@ -688,7 +730,8 @@ class ReconX:
                             )
                         except Exception as e:
                             print(f"Error downloading {script}: {e}")
-
+                
+                self.save_scan_results("javascript", None)
                 self.progress_bar.stop()
                 self.progress_label.configure(
                     text=f"Done! Processed {processed} JavaScript files"
@@ -771,7 +814,8 @@ class ReconX:
             # Add ASN info to tree
             for prop, value in asn_info.items():
                 self.asn_tree.insert("", "end", values=(prop, value))
-
+            
+            self.save_scan_results("asn", None)
             self.progress_bar.stop()
             self.progress_label.configure(text="ASN info retrieved successfully!")
             self.button.configure(state=ctk.NORMAL)
@@ -848,8 +892,9 @@ class ReconX:
 
             try:
                 self.start_scan()
-                
-                with ThreadPoolExecutor(max_workers=100) as executor:
+
+                max_threads = int(self.thread_entry.get())
+                with ThreadPoolExecutor(max_workers=max_threads) as executor:
                     futures = {executor.submit(self.scan_port, host, port): port for port in range(start_port, total_ports)}
                     for future in as_completed(futures):
                         if not self.is_scanning:
@@ -864,7 +909,8 @@ class ReconX:
                             open_ports.append(port)
                             self.ports_tree.insert("", "end", values=(port,))
                             self.services_tree.insert("", "end", values=(f"{service}"))
-
+                
+                self.save_scan_results("ports", None)
                 self.progress_bar.stop()
                 self.progress_label.configure(text=f"Done! Found {len(open_ports)} open ports")
                 self.button.configure(state=ctk.NORMAL)
@@ -908,6 +954,7 @@ class ReconX:
             r = s.get(f"https://{domain}", verify=False)
             for header, value in r.headers.items():
                 self.headers_tree.insert("", "end", values=(header, value))
+            self.save_scan_results("headers", None)
             self.progress_bar.stop()
             self.progress_label.configure(text="Done!")
             self.button.configure(state=ctk.NORMAL)
@@ -977,7 +1024,9 @@ class ReconX:
             # Process subdomains concurrently
             try:
                 self.start_scan()
-                with ThreadPoolExecutor(max_workers=10) as executor:
+
+                max_threads = int(self.thread_entry.get())
+                with ThreadPoolExecutor(max_workers=max_threads) as executor:
                     # Submit all tasks
                     future_to_subdomain = {
                         executor.submit(self.process_subdomain, subdomain): subdomain 
@@ -1007,6 +1056,7 @@ class ReconX:
                 self.progress_label.configure(
                     text=f"Done! Found {len(self.subdomain_tree.get_children())} subdomains"
                 )
+                self.save_scan_results("subdomains", None)
                 self.button.configure(state=ctk.NORMAL)
                 self.clear_button.configure(state=ctk.NORMAL)
     
@@ -1059,6 +1109,60 @@ class ReconX:
 
     def whois_thread(self):
         threading.Thread(target=self.whois).start()
+
+    def save_scan_results(self, scan_type, results):
+        """Save scan results to a file if checkbox is checked"""
+        if not self.save_results_var.get():
+            return
+            
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        domain = self.entry.get().replace("https://", "").replace("http://", "").replace("/", "_")
+        filename = f"results/{domain}_{scan_type}_{timestamp}.txt"
+        
+        # Create results directory if it doesn't exist
+        os.makedirs("results", exist_ok=True)
+        
+        try:
+            with open(filename, "w") as f:
+                if scan_type == "subdomains":
+                    for item in self.subdomain_tree.get_children():
+                        values = self.subdomain_tree.item(item)["values"]
+                        f.write(f"Domain: {values[0]}, Status: {values[1]}, IP: {values[2]}, Server: {values[3]}\n")
+                
+                elif scan_type == "ports":
+                    for item in self.ports_tree.get_children():
+                        port = self.ports_tree.item(item)["values"][0]
+                        f.write(f"Open Port: {port}\n")
+                    
+                elif scan_type == "asn":
+                    for item in self.asn_tree.get_children():
+                        values = self.asn_tree.item(item)["values"]
+                        f.write(f"{values[0]}: {values[1]}\n")
+                
+                elif scan_type == "headers":
+                    for item in self.headers_tree.get_children():
+                        values = self.headers_tree.item(item)["values"]
+                        f.write(f"{values[0]}: {values[1]}\n")
+                
+                elif scan_type == "javascript":
+                    for item in self.javascript_tree.get_children():
+                        values = self.javascript_tree.item(item)["values"]
+                        f.write(f"File: {values[0]}, Status: {values[1]}\n")
+                
+                elif scan_type == "links":
+                    for item in self.links_tree.get_children():
+                        link = self.links_tree.item(item)["values"][0]
+                        f.write(f"{link}\n")
+                
+                elif scan_type == "whois":
+                    for item in self.whois_tree.get_children():
+                        values = self.whois_tree.item(item)["values"]
+                        f.write(f"{values[0]}: {values[1]}\n")
+                        
+            print(f"Results saved to {filename}")
+            
+        except Exception as e:
+            print(f"Error saving results: {e}")
 
 
 if __name__ == "__main__":
