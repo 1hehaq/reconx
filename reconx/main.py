@@ -606,7 +606,12 @@ class ReconX:
             try:
                 self.start_scan()
                 s = requests.Session()
-                r = s.get(domain, verify=False)
+                proxy = self.proxy_entry.get()
+                if proxy:
+                    s.proxies = {"http": proxy, "https": proxy}
+                    r = s.get(domain, verify=False, proxies=s.proxies)
+                else:
+                    r = s.get(domain, verify=False)
                 soup = BeautifulSoup(r.content, "html.parser")
                 links = soup.find_all('a', href=True)
 
@@ -690,7 +695,13 @@ class ReconX:
 
             # Fetch the main page
             url = f"https://{domain}"
-            response = requests.get(url, verify=False)
+            s = requests.Session()
+            proxy = self.proxy_entry.get()
+            s.proxies = {"http": proxy, "https": proxy}
+            if proxy:
+                response = s.get(url, verify=False, proxies=s.proxies)
+            else:
+                response = s.get(url, verify=False)
             soup = BeautifulSoup(response.content, "html.parser")
 
             # Find all script tags
@@ -758,7 +769,13 @@ class ReconX:
         try:
             if not script_url.startswith("http"):
                 script_url = f"{base_url}/{script_url.lstrip('/')}"
-            response = requests.get(script_url, verify=False)
+            s = requests.Session()
+            proxy = self.proxy_entry.get()
+            s.proxies = {"http": proxy, "https": proxy}
+            if proxy:
+                response = requests.get(script_url, verify=False, proxies=s.proxies)
+            else:
+                response = requests.get(script_url, verify=False)
             if response.status_code == 200:
                 return response.status_code
             else:
@@ -951,7 +968,12 @@ class ReconX:
                 return
 
             s = requests.Session()
-            r = s.get(f"https://{domain}", verify=False)
+            proxy = self.proxy_entry.get()
+            s.proxies = {"http": proxy, "https": proxy}
+            if proxy:
+                r = s.get(f"https://{domain}", verify=False, proxies=s.proxies)
+            else:
+                r = s.get(f"https://{domain}", verify=False)
             for header, value in r.headers.items():
                 self.headers_tree.insert("", "end", values=(header, value))
             self.save_scan_results("headers", None)
@@ -970,7 +992,12 @@ class ReconX:
         """Helper function to process individual subdomains"""
         try:
             s = requests.Session()
-            r = s.get(f"https://{subdomain}", verify=False, timeout=5)
+            proxy = self.proxy_entry.get()
+            s.proxies = {"http": proxy, "https": proxy}
+            if proxy:
+                r = s.get(f"https://{subdomain}", verify=False, timeout=5, proxies=s.proxies)
+            else:
+                r = s.get(f"https://{subdomain}", verify=False, timeout=5)
             ip = socket.gethostbyname(subdomain)
             return (subdomain, r.status_code, ip, r.headers.get("Server"))
         except Exception as e:
@@ -1087,6 +1114,9 @@ class ReconX:
         self.progress_label.configure(text="Waiting for input...")
         if self.menu.get() == "Headers":
             self.headers_tree.delete(*self.headers_tree.get_children())
+            self.progress_label.configure(text="Waiting for input...")
+        if self.menu.get() == "Links":
+            self.links_tree.delete(*self.links_tree.get_children())
             self.progress_label.configure(text="Waiting for input...")
 
     def subdomain_thread(self):
