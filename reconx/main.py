@@ -38,7 +38,7 @@ class ReconX:
         def about():
             messagebox.showinfo("Author", "ReconX by c0d3ninja")
 
-        def update(self):
+        def update():
             """Check for and apply updates with progress indication"""
             try:
                 self.progress_bar.start()
