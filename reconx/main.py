@@ -18,6 +18,8 @@ import re
 import whois
 import json
 from datetime import datetime
+import os
+import sys
 
 requests.packages.urllib3.disable_warnings()
 
@@ -34,6 +36,25 @@ class ReconX:
         self.window.resizable(False, False)
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
+
+        icon_path = os.path.join(os.path.dirname(__file__), "icons")
+
+        # Update other image loads
+        icon_photo = tk.PhotoImage(file=("icons/logo.png"))
+        self.window.iconphoto(False, icon_photo)
+        self.stop_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "stop.png")), size=(20, 20))
+        self.start_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "start.png")), size=(20, 20))
+        self.clear_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "clear.png")), size=(20, 20))
+        self.logo_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "logo.png")), size=(100, 100))
+        self.home_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "home.png")), size=(30, 30))
+        self.settings_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "settings.png")), size=(30, 30))
+        self.subdomains_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "domains.png")), size=(30, 30))
+        self.asn_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "asn.png")), size=(30, 30))
+        self.headers_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "headers.png")), size=(30, 30))
+        self.javascript_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "javascript.png")), size=(30, 30))
+        self.links_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "links.png")), size=(30, 30))
+        self.whois_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "whois.png")), size=(30, 30))
+
 
         def about():
             messagebox.showinfo("Author", "ReconX by c0d3ninja")
@@ -137,7 +158,6 @@ class ReconX:
         self.endport_entry.pack(side=ctk.LEFT, padx=10, pady=10)
 
         self.is_scanning = False
-        self.stop_image = ctk.CTkImage(Image.open("icons/stop.png"), size=(20, 20))
         self.stop_button = ctk.CTkButton(self.frame, width=25, height=40, text="", 
                                         font=("Arial", 14), text_color="white",
                                         command=self.stop_scan, image=self.stop_image,
@@ -145,12 +165,10 @@ class ReconX:
         self.stop_button.pack(side=ctk.RIGHT, padx=10, pady=10)
         self.stop_button.configure(state=ctk.DISABLED)
 
-        self.start_image = ctk.CTkImage(Image.open("icons/start.png"), size=(20, 20))
         self.button = ctk.CTkButton(self.frame, width=25, height=40, text="", font=("Arial", 14), text_color="white", 
                                     command=self.check_selected, image=self.start_image, corner_radius=100, fg_color="#14375e")
         self.button.pack(side=ctk.RIGHT, padx=10, pady=10)
 
-        self.clear_image = ctk.CTkImage(Image.open("icons/clear.png"), size=(20, 20))
         self.clear_button = ctk.CTkButton(self.frame, width=25, height=40, text="", font=("Arial", 14), text_color="white", 
                                           command=self.clear_textbox, image=self.clear_image, corner_radius=100, fg_color="#14375e")
         self.clear_button.pack(side=ctk.RIGHT, padx=10, pady=10)
@@ -192,7 +210,6 @@ class ReconX:
         #self.textbox.configure(yscrollcommand=self.scrollbar.set)
         #self.scrollbar.configure(command=self.textbox.yview)
 
-        self.logo_image = ctk.CTkImage(Image.open("icons/logo.png"), size=(100, 100)) 
         self.home_label = ctk.CTkLabel(self.tabview.tab("Home"), text="", font=("Arial", 25), text_color="white", image=self.logo_image, compound="top")
         self.home_label.pack(side=ctk.TOP, padx=10, pady=10)
 
@@ -342,48 +359,40 @@ class ReconX:
 
 
 
-        self.home_image = ctk.CTkImage(Image.open("icons/home.png"), size=(30, 30)) 
         self.home_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.home_image, 
                                                corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Home"))
         self.home_button.pack(side=ctk.LEFT, padx=10, pady=10)
 
 
-        self.settings_image = ctk.CTkImage(Image.open("icons/settings.png"), size=(30, 30)) 
         self.settings_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.settings_image, 
                                                corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Settings"))
         self.settings_button.pack(side=ctk.LEFT, padx=10, pady=10)
 
 
-        self.subdomains_image = ctk.CTkImage(Image.open("icons/domains.png"), size=(30, 30)) 
         self.subdomains_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.subdomains_image, 
                                                corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Subdomains"))
         self.subdomains_button.pack(side=ctk.LEFT, padx=10, pady=10)
 
-
-        self.asn_image = ctk.CTkImage(Image.open("icons/asn.png"), size=(30, 30))     
+  
         self.asn_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.asn_image, 
                                                corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("ASN"))
         self.asn_button.pack(side=ctk.LEFT, padx=10, pady=10)
-
-        self.headers_image = ctk.CTkImage(Image.open("icons/headers.png"), size=(30, 30))     
+   
         self.headers_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.headers_image, 
                                                corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Headers"))
         self.headers_button.pack(side=ctk.LEFT, padx=10, pady=10)
 
-
-        self.javascript_image = ctk.CTkImage(Image.open("icons/javascript.png"), size=(30, 30))     
+   
         self.javascript_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.javascript_image, 
                                                corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("JavaScript"))
         self.javascript_button.pack(side=ctk.LEFT, padx=10, pady=10)
 
-
-        self.links_image = ctk.CTkImage(Image.open("icons/links.png"), size=(30, 30))     
+   
         self.links_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.links_image, 
                                                corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Links"))
         self.links_button.pack(side=ctk.LEFT, padx=10, pady=10)
 
-
-        self.whois_image = ctk.CTkImage(Image.open("icons/whois.png"), size=(30, 30))     
+    
         self.whois_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.whois_image, 
                                                corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Whois"))
         self.whois_button.pack(side=ctk.LEFT, padx=10, pady=10)
