@@ -32,7 +32,7 @@ ReconX is a powerful reconnaissance tool with a graphical user interface built u
 
 1. Clone the repository:
 
-git clone https://github.com/yourusername/reconx.git
+git clone https://github.com/c0d3ninja/reconx.git
 
 2. Install required Python packages:
 
