@@ -38,6 +38,58 @@ class ReconX:
         def about():
             messagebox.showinfo("Author", "ReconX by c0d3ninja")
 
+        def update(self):
+            """Check for and apply updates with progress indication"""
+            try:
+                self.progress_bar.start()
+                self.progress_label.configure(text="Checking for updates...")
+                self.button.configure(state=ctk.DISABLED)
+                self.clear_button.configure(state=ctk.DISABLED)
+
+                # Fetch first to check for updates
+                fetch_result = subprocess.run(
+                    ["git", "fetch"], 
+                    check=True, 
+                    capture_output=True, 
+                    text=True
+                )
+
+                # Check if we're behind the remote
+                status_result = subprocess.run(
+                    ["git", "status", "-uno"],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+
+                if "Your branch is behind" in status_result.stdout:
+                    # There are updates available
+                    self.progress_label.configure(text="Downloading updates...")
+                    
+                    # Perform the actual update
+                    pull_result = subprocess.run(
+                        ["git", "pull"],
+                        check=True,
+                        capture_output=True,
+                        text=True
+                    )
+
+                    if pull_result.returncode == 0:
+                        self.progress_label.configure(text="Update completed successfully!")
+                    else:
+                        self.progress_label.configure(text="Update failed. Please try again.")
+                else:
+                    self.progress_label.configure(text="Already up to date!")
+
+            except subprocess.CalledProcessError as e:
+                self.progress_label.configure(text=f"Update error: {str(e)}")
+            except Exception as e:
+                self.progress_label.configure(text=f"Unexpected error: {str(e)}")
+            finally:
+                self.progress_bar.stop()
+                self.button.configure(state=ctk.NORMAL)
+                self.clear_button.configure(state=ctk.NORMAL)
+
         style = ttk.Style()
         style.configure("Treeview", background="#000000", fieldbackground="#000000", foreground="white", font=("Arial", 14))
         style.map("Treeview", background=[("selected", "#14375e")])
@@ -47,6 +99,7 @@ class ReconX:
         file_button_help =  file_menu.add_cascade("Help")
 
         submenu = CustomDropdownMenu(widget=file_button, bg_color="#000000")
+        submenu.add_option("Update", command=update)
         submenu.add_option("Exit", command=exit)
 
         helpmenu = CustomDropdownMenu(widget=file_button_help, bg_color="#000000")
@@ -155,6 +208,15 @@ class ReconX:
 
         self.proxy_controls_frame = ctk.CTkFrame(self.thread_settings_frame, fg_color="#000000")
         self.proxy_controls_frame.pack(side=ctk.TOP, padx=5, pady=5)
+
+        self.ua_controls_frame = ctk.CTkFrame(self.thread_settings_frame, fg_color="#000000")
+        self.ua_controls_frame.pack(side=ctk.TOP, padx=5, pady=5)
+
+        ua_label = ctk.CTkLabel(self.ua_controls_frame, text="User-Agent:", text_color="white")
+        ua_label.pack(side=ctk.LEFT, padx=10)
+        self.ua_entry = ctk.CTkEntry(self.ua_controls_frame, width=125, height=25, fg_color="#000000")
+        self.ua_entry.pack(side=ctk.LEFT, padx=10)
+
 
         proxy_label = ctk.CTkLabel(self.proxy_controls_frame, text="Proxy:", text_color="white")
         proxy_label.pack(side=ctk.LEFT, padx=27)
@@ -607,11 +669,19 @@ class ReconX:
                 self.start_scan()
                 s = requests.Session()
                 proxy = self.proxy_entry.get()
+                user_agent = self.ua_entry.get()
+                if user_agent:
+                    s.headers["User-Agent"] = user_agent
                 if proxy:
                     s.proxies = {"http": proxy, "https": proxy}
                     r = s.get(domain, verify=False, proxies=s.proxies)
+                elif user_agent:
+                    r = s.get(domain, verify=False, headers={"User-Agent": user_agent})
+                elif user_agent and proxy:
+                    r = s.get(domain, verify=False, headers={"User-Agent": user_agent}, proxies={"http": proxy, "https": proxy})
                 else:
                     r = s.get(domain, verify=False)
+
                 soup = BeautifulSoup(r.content, "html.parser")
                 links = soup.find_all('a', href=True)
 
@@ -843,7 +913,6 @@ class ReconX:
             self.progress_label.configure(text=f"Error: {str(e)}")
             self.button.configure(state=ctk.NORMAL)
             self.clear_button.configure(state=ctk.NORMAL)
-
 
     def scan_port(self, host, port):
         """Scan a single port and identify its service."""
