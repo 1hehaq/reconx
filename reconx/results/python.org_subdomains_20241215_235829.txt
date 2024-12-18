@@ -1,0 +1,48 @@
+Domain: community.uk.python.org, Status: 200, IP: 185.199.111.153, Server: GitHub.com
+Domain: hacktoberfest.es.python.org, Status: 200, IP: 185.199.110.153, Server: GitHub.com
+Domain: legacy.python.org, Status: 200, IP: 167.99.21.118, Server: Apache/2.4.58 (Ubuntu)
+Domain: membership.uk.python.org, Status: 404, IP: 52.56.203.177, Server: anvil
+Domain: pycon-archive.python.org, Status: 200, IP: 185.199.109.153, Server: GitHub.com
+Domain: uk.python.org, Status: 200, IP: 104.198.14.52, Server: Netlify
+Domain: ukpatl.uk.python.org, Status: 200, IP: 100.28.201.155, Server: Netlify
+Domain: pypi.python.org, Status: 200, IP: 151.101.116.223, Server: None
+Domain: chat.uk.python.org, Status: 404, IP: 35.179.56.184, Server: None
+Domain: warehouse.python.org, Status: 200, IP: 151.101.116.223, Server: None
+Domain: calendario.es.python.org, Status: 200, IP: 46.4.94.207, Server: Apache/2.4.58 (Unix) OpenSSL/3.1.4 mod_wsgi/4.9.4 Python/3.12
+Domain: blog.python.org, Status: 200, IP: 151.101.116.223, Server: GSE
+Domain: jobs.python.org, Status: 200, IP: 159.89.245.108, Server: None
+Domain: mail.python.org, Status: 200, IP: 188.166.95.178, Server: Apache/2.4.39 (Ubuntu)
+Domain: pl.python.org, Status: 200, IP: 57.128.173.223, Server: nginx/1.27.1
+Domain: www.python.org, Status: 200, IP: 151.101.116.223, Server: None
+Domain: comunidades.es.python.org, Status: 200, IP: 185.199.111.153, Server: GitHub.com
+Domain: packaging.python.org, Status: 200, IP: 104.16.254.120, Server: cloudflare
+Domain: planet.python.org, Status: 200, IP: 159.89.245.108, Server: nginx
+Domain: python.org, Status: 200, IP: 151.101.0.223, Server: None
+Domain: www.es.python.org, Status: 200, IP: 185.199.111.153, Server: GitHub.com
+Domain: bugs.python.org, Status: 200, IP: 45.55.99.191, Server: nginx
+Domain: openbadges.es.python.org, Status: 200, IP: 46.4.94.207, Server: Apache/2.4.58 (Unix) OpenSSL/3.1.4 mod_wsgi/4.9.4 Python/3.12
+Domain: docs.python.org, Status: 200, IP: 199.232.88.223, Server: nginx
+Domain: svn.python.org, Status: 200, IP: 167.99.21.118, Server: Apache/2.4.58 (Ubuntu)
+Domain: testpypi.python.org, Status: 200, IP: 199.232.88.223, Server: None
+Domain: test.python.org, Status: 200, IP: 199.232.88.223, Server: None
+Domain: es.python.org, Status: 200, IP: 185.199.110.153, Server: GitHub.com
+Domain: policies.python.org, Status: 200, IP: 104.16.253.120, Server: cloudflare
+Domain: peps.python.org, Status: 200, IP: 151.101.116.223, Server: GitHub.com
+Domain: africa.python.org, Status: 502, IP: 116.202.118.106, Server: nginx
+Domain: console.python.org, Status: 403, IP: 159.89.245.108, Server: None
+Domain: packages.python.org, Status: 200, IP: 159.89.245.108, Server: None
+Domain: hg.python.org, Status: 200, IP: 159.89.245.108, Server: Apache/2.4.58 (Ubuntu)
+Domain: downloads.python.org, Status: 200, IP: 199.232.88.223, Server: Varnish
+Domain: buildbot.python.org, Status: 200, IP: 159.89.245.108, Server: nginx
+Domain: comunidad.es.python.org, Status: 200, IP: 185.195.96.31, Server: Apache/2.4.25 (Debian)
+Domain: cheeseshop.python.org, Status: 200, IP: 167.99.21.118, Server: None
+Domain: discuss.python.org, Status: 200, IP: 184.105.99.75, Server: nginx
+Domain: status.python.org, Status: 200, IP: 108.138.106.129, Server: AtlassianEdge
+Domain: hg.es.python.org, Status: 200, IP: 46.4.94.207, Server: Apache/2.4.58 (Unix) OpenSSL/3.1.4 mod_wsgi/4.9.4 Python/3.12
+Domain: education.python.org, Status: 200, IP: 15.197.246.237, Server: gunicorn/20.0.4
+Domain: devguide.python.org, Status: 200, IP: 104.16.253.120, Server: cloudflare
+Domain: documentos-asociacion.es.python.org, Status: 200, IP: 46.4.94.207, Server: Apache/2.4.58 (Unix) OpenSSL/3.1.4 mod_wsgi/4.9.4 Python/3.12
+Domain: doc.python.org, Status: 200, IP: 151.101.116.223, Server: nginx
+Domain: lists.es.python.org, Status: 200, IP: 46.4.94.207, Server: Apache/2.4.58 (Unix) OpenSSL/3.1.4 mod_wsgi/4.9.4 Python/3.12
+Domain: wiki.python.org, Status: 200, IP: 167.99.21.118, Server: Apache/2.4.41 (Ubuntu)
+Domain: speed.python.org, Status: 200, IP: 167.99.21.118, Server: nginx
