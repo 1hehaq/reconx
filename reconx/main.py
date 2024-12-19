@@ -1117,9 +1117,26 @@ class ReconX:
                 return
 
             # Get subdomains list first
+            current_script_dir = os.path.dirname(os.path.abspath(__file__))
+            spotter_path = os.path.join(current_script_dir, 'scripts', 'spotter.sh')
+            certsh_path = os.path.join(current_script_dir, 'scripts', 'certsh.sh')
+
+            cmd = f"{spotter_path} {domain} | uniq | sort"
+            p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            spotterout, err = p.communicate()
+            spotterout = spotterout.decode()
+
+            cmd = f"{certsh_path} {domain} | uniq | sort"
+            p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            certshout, err = p.communicate()
+            certshout = certshout.decode()
+
             cmd = f"subfinder -d {domain} -silent"
             p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             subdomains = [line.decode().strip() for line in p.stdout if line.decode().strip()]
+            subdomains = list(set(subdomains))
+            subdomains.extend(spotterout.split("\n"))
+            subdomains.extend(certshout.split("\n"))
 
             # Update progress label with total count
             total_subdomains = len(subdomains)
