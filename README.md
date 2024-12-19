@@ -42,9 +42,13 @@ pip install -r requirements.txt
 
 go install -v github.com/projectdiscovery/subfinder/v2@latest
 
-4. Run the script:
+4. Cd into reconx directory:
 
-python reconx.py
+cd reconx
+
+5. Run ReconX:
+
+python3 main.py
 
 ## Usage
 
