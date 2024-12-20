@@ -93,7 +93,7 @@ class ReconX:
         )
 
         def about():
-            messagebox.showinfo("Author", "ReconX by c0d3ninja")
+            messagebox.showinfo("Author", "ReconX by c0d3ninja & 1hehaq")
 
         def update():
             """Check for and apply updates with progress indication"""
