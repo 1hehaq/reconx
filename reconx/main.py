@@ -1,1336 +1,768 @@
-from tkinter import messagebox, ttk
-from PIL import Image
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from colorama import Fore
-from ipwhois import IPWhois
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin
-from ipwhois import IPWhois
-from CTkMenuBar import *
 import customtkinter as ctk
-import requests
-import threading
-import os
-import subprocess
-import socket
 import tkinter as tk
+from PIL import Image
+import os
+import threading
+import requests
+import socket
 import re
 import whois
+from ipwhois import IPWhois
+from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from modules.subenum import SubdomainEnumerator
+from tkinter import messagebox, ttk
 import json
-from datetime import datetime
-import os
 import sys
-from modules.subdomain_enum import SubdomainEnumerator
-from modules.tools import check_and_install_tools
-
-requests.packages.urllib3.disable_warnings()
+import queue
+import time
+from googlesearch import search
+from github import Github
+import urllib.parse
+from modules.dorking import DorkScanner
+from modules.portscan import PortScanner
+from modules.headers import HeaderScanner
 
 class ReconX:
     def __init__(self):
+        # Refined Color Palette with Dark Theme
+        self.colors = {
+            "background": "#121212",      # Deep dark background
+            "primary": "#1E88E5",         # Vibrant blue
+            "secondary": "#1E1E1E",       # Slightly lighter than background
+            "text": "#E0E0E0",            # Soft light grey (not pure white)
+            "accent": "#4FC3F7",          # Light blue accent
+            "hover": "#2C3E50",           # Dark hover color
+            "border": "#2C3E50"           # Dark border color
+        }
+
+        # Main Window Setup
         self.window = ctk.CTk()
-        self.window.title("ReconX v1.1")
-        self.window.geometry("1025x575")
-        self.window.configure(bg="#000000")
-        self.window.configure(fg_color="#000000")
-        
-        # Some issues when it run on posix
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        icon_path = os.path.join(current_dir, "icons")
-        
-        icon_photo = tk.PhotoImage(file=os.path.join(icon_path, "logo.png"))
-        self.window.iconphoto(False, icon_photo)
-        self.window.resizable(False, False)
+        self.window.title("ReconX - Reconnaissance Framework")
+        self.window.geometry("1100x700")
+        self.window.configure(fg_color=self.colors["background"])
+
+        # Custom Styling
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
-        self.stop_image = ctk.CTkImage(
-            Image.open(os.path.join(icon_path, "stop.png")), 
-            size=(20, 20)
+        # Load icons first
+        self.load_icons()
+
+        # Treeview Style
+        self.style = ttk.Style()
+        self.style.theme_use("default")
+        self.style.configure("Treeview", 
+            background=self.colors["background"],
+            foreground=self.colors["text"],
+            fieldbackground=self.colors["background"],
+            font=('Arial', 10)
         )
-        self.start_image = ctk.CTkImage(
-            Image.open(os.path.join(icon_path, "start.png")), 
-            size=(20, 20)
-        )
-        self.clear_image = ctk.CTkImage(
-            Image.open(os.path.join(icon_path, "clear.png")), 
-            size=(20, 20)
-        )
-        self.logo_image = ctk.CTkImage(
-            Image.open(os.path.join(icon_path, "logo.png")), 
-            size=(100, 100)
-        )
-        self.home_image = ctk.CTkImage(
-            Image.open(os.path.join(icon_path, "home.png")), 
-            size=(30, 30)
-        )
-        self.settings_image = ctk.CTkImage(
-            Image.open(os.path.join(icon_path, "settings.png")), 
-            size=(30, 30)
-        )
-        self.subdomains_image = ctk.CTkImage(
-            Image.open(os.path.join(icon_path, "domains.png")), 
-            size=(30, 30)
-        )
-        self.asn_image = ctk.CTkImage(
-            Image.open(os.path.join(icon_path, "asn.png")), 
-            size=(30, 30)
-        )
-        self.headers_image = ctk.CTkImage(
-            Image.open(os.path.join(icon_path, "headers.png")), 
-            size=(30, 30)
-        )
-        self.javascript_image = ctk.CTkImage(
-            Image.open(os.path.join(icon_path, "javascript.png")), 
-            size=(30, 30)
-        )
-        self.links_image = ctk.CTkImage(
-            Image.open(os.path.join(icon_path, "links.png")), 
-            size=(30, 30)
-        )
-        self.whois_image = ctk.CTkImage(
-            Image.open(os.path.join(icon_path, "whois.png")), 
-            size=(30, 30)
+        self.style.map("Treeview", 
+            background=[('selected', self.colors["primary"])],
+            foreground=[('selected', self.colors["text"])]
         )
 
-        def about():
-            messagebox.showinfo("Author", "ReconX by c0d3ninja & 1hehaq")
+        # Setup Main Layout
+        self.create_layout()
+        self.create_navigation()
+        self.create_content_area()
+        self.setup_theme()
 
-        def update():
-            """Check for and apply updates with progress indication"""
-            try:
-                self.progress_bar.start()
-                self.progress_label.configure(text="Checking for updates...")
-                self.button.configure(state=ctk.DISABLED)
-                self.clear_button.configure(state=ctk.DISABLED)
-
-                # Fetch first to check for updates
-                fetch_result = subprocess.run(
-                    ["git", "fetch"], 
-                    check=True, 
-                    capture_output=True, 
-                    text=True
-                )
-
-                # Check if we're behind the remote
-                status_result = subprocess.run(
-                    ["git", "status", "-uno"],
-                    check=True,
-                    capture_output=True,
-                    text=True
-                )
-
-                if "Your branch is behind" in status_result.stdout:
-                    # There are updates available
-                    self.progress_label.configure(text="Downloading updates...")
-                    
-                    # Perform the actual update
-                    pull_result = subprocess.run(
-                        ["git", "pull"],
-                        check=True,
-                        capture_output=True,
-                        text=True
-                    )
-
-                    if pull_result.returncode == 0:
-                        self.progress_label.configure(text="Update completed successfully!")
-                    else:
-                        self.progress_label.configure(text="Update failed. Please try again.")
-                else:
-                    self.progress_label.configure(text="Already up to date!")
-
-            except subprocess.CalledProcessError as e:
-                self.progress_label.configure(text=f"Update error: {str(e)}")
-            except Exception as e:
-                self.progress_label.configure(text=f"Unexpected error: {str(e)}")
-            finally:
-                self.progress_bar.stop()
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
-
-        style = ttk.Style()
-        style.configure("Treeview", background="#000000", fieldbackground="#000000", foreground="white", font=("Arial", 14))
-        style.map("Treeview", background=[("selected", "#14375e")])
-
-        file_menu = CTkMenuBar(master=self.window, bg_color="#000000")
-        file_button = file_menu.add_cascade("File")
-        file_button_help =  file_menu.add_cascade("Help")
-
-        submenu = CustomDropdownMenu(widget=file_button, bg_color="#000000")
-        submenu.add_option("Update", command=update)
-        submenu.add_option("Exit", command=exit)
-
-        helpmenu = CustomDropdownMenu(widget=file_button_help, bg_color="#000000")
-        helpmenu.add_option("About", command=about)
-
-        self.frame = ctk.CTkFrame(self.window, border_width=0, width=780, height=430, fg_color="#000000", border_color="#000000")
-        self.frame.pack(padx=10, pady=10)
-
-        self.frame_top = ctk.CTkFrame(self.window, width=780, height=430, fg_color="#000000", border_width=1, border_color="white")
-        self.frame_top.pack(side=ctk.RIGHT, padx=10, pady=10)
-
-        self.menu_frame = ctk.CTkFrame(self.frame_top, width=750, height=360, fg_color="#000000")
-        self.menu_frame.pack(side=ctk.TOP, padx=10, pady=10)
-
-        self.settings_frame = ctk.CTkFrame(self.window, width=750, height=360, border_width=1, border_color="white", fg_color="#000000")
-        self.settings_frame.pack(side=ctk.TOP, padx=10, pady=10, fill="both", expand=True)
-        self.settings_frame.grid_propagate(False)
-
-        self.progress_bar = ctk.CTkProgressBar(self.frame_top, width=700, height=7, corner_radius=10)
-        self.progress_bar.pack(side=ctk.BOTTOM, padx=10, pady=10)
-
-        self.progress_label = ctk.CTkLabel(self.frame_top, text="Waiting for input...", font=("Arial", 14), text_color="white")
-        self.progress_label.pack(side=ctk.BOTTOM, padx=10, pady=10)
-
-        self.entry = ctk.CTkEntry(self.frame, width=580, height=40, placeholder_text="Enter a domain", font=("Arial", 14), text_color="white", bg_color="#000000", fg_color="#000000")
-        self.entry.pack(side=ctk.LEFT, padx=10, pady=10)
-
-        self.start_port_frame = ctk.CTkFrame(self.settings_frame, width=40, height=360, fg_color="#000000")
-        self.start_port_frame.pack(side=ctk.BOTTOM, padx=10, pady=10)
-        self.start_port_frame.grid_propagate(False)
-
-        self.startport_entry = ctk.CTkEntry(self.start_port_frame, width=50, height=9, placeholder_text="1", font=("Arial", 14), text_color="white", bg_color="#000000", fg_color="#000000")
-        self.startport_entry.pack(side=ctk.LEFT, padx=10, pady=10)
-        self.endport_entry = ctk.CTkEntry(self.start_port_frame, width=50, height=9, placeholder_text="1024", font=("Arial", 14), text_color="white", bg_color="#000000", fg_color="#000000")
-        self.endport_entry.pack(side=ctk.LEFT, padx=10, pady=10)
-
+        # Existing features setup
         self.is_scanning = False
-        self.stop_button = ctk.CTkButton(self.frame, width=25, height=40, text="", 
-                                        font=("Arial", 14), text_color="white",
-                                        command=self.stop_scan, image=self.stop_image,
-                                        corner_radius=100, fg_color="#14375e")
-        self.stop_button.pack(side=ctk.RIGHT, padx=10, pady=10)
-        self.stop_button.configure(state=ctk.DISABLED)
+        self.current_scan_type = None
 
-        self.button = ctk.CTkButton(self.frame, width=25, height=40, text="", font=("Arial", 14), text_color="white", 
-                                    command=self.check_selected, image=self.start_image, corner_radius=100, fg_color="#14375e")
-        self.button.pack(side=ctk.RIGHT, padx=10, pady=10)
+        # Add a status queue for thread communication
+        self.status_queue = queue.Queue()
+        self.status_update_id = None
 
-        self.clear_button = ctk.CTkButton(self.frame, width=25, height=40, text="", font=("Arial", 14), text_color="white", 
-                                          command=self.clear_textbox, image=self.clear_image, corner_radius=100, fg_color="#14375e")
-        self.clear_button.pack(side=ctk.RIGHT, padx=10, pady=10)
-
-
-        self.waiting_frames = ["Waiting for input", "Waiting for input.", "Waiting for input..", "Waiting for input..."]
-        self.current_frame = 0
-        self.animate_waiting()
-
-        #self.textbox = ctk.CTkTextbox(self.frame_top, width=760, height=360, font=("Arial", 14), text_color="white", bg_color="#000000", fg_color="#000000")
-        #self.textbox.pack(side=ctk.LEFT, padx=10, pady=10)
-
-        self.menu = ctk.CTkOptionMenu(self.frame, width=100, height=25, values=["Headers", "Port Scan", "ASN", "Subdomains", "Links", "JavaScript", "Whois"], font=("Arial", 14), text_color="white", 
-                                      bg_color="#000000", fg_color="#000000")
-        self.menu.pack(side=ctk.RIGHT, padx=10, pady=10)
-
-        self.tabview = ctk.CTkTabview(self.frame_top, width=760, height=360, text_color="white", fg_color="#000000", 
-                                      border_width=0, corner_radius=0, segmented_button_selected_color="#000000", segmented_button_selected_hover_color="#000000", segmented_button_unselected_color="#000000", 
-                                      segmented_button_unselected_hover_color="#000000")
-        self.tabview.pack(side=ctk.LEFT, padx=10, pady=10)
-        self.tabview.add("Home")
-        self.tabview.add("Settings")
-        self.tabview.add("Subdomains")
-        self.tabview.add("ASN")
-        self.tabview.add("Headers")
-        self.tabview.add("Links")
-        self.tabview.add("JavaScript")
-        self.tabview.add("Whois")
-        self.tabview._segmented_button.configure(border_width=0, fg_color="#000000", text_color="#000000")
-
-        self.port_services_tabview = ctk.CTkTabview(self.settings_frame, width=200, height=500, text_color="white", fg_color="#000000")
-        self.port_services_tabview.pack(side=ctk.TOP, padx=10, pady=10)
-        self.port_services_tabview.add("Ports")
-        self.port_services_tabview.add("Services")
-        self.port_services_tabview._segmented_button.configure(border_width=0, fg_color="#000000", text_color="#000000")
-
-        #self.scrollbar = ctk.CTkScrollbar(self.frame2, width=15, height=360, orientation="vertical")
-        #self.scrollbar.pack(side=ctk.RIGHT, fill=ctk.Y)
-        #self.textbox.configure(yscrollcommand=self.scrollbar.set)
-        #self.scrollbar.configure(command=self.textbox.yview)
-
-        self.home_label = ctk.CTkLabel(self.tabview.tab("Home"), text="", font=("Arial", 25), text_color="white", image=self.logo_image, compound="top")
-        self.home_label.pack(side=ctk.TOP, padx=10, pady=10)
-
-        self.home_label = ctk.CTkLabel(self.tabview.tab("Home"), text="WELCOME TO RECONX", font=("Arial", 25), text_color="white")
-        self.home_label.pack(side=ctk.TOP, padx=10, pady=10)
-
-        # Thread Settings
-        self.thread_settings_frame = ctk.CTkFrame(self.tabview.tab("Settings"), fg_color="#000000")
-        self.thread_settings_frame.pack(side=ctk.TOP, fill="x", padx=10, pady=5)
-
-        self.thread_controls_frame = ctk.CTkFrame(self.thread_settings_frame, fg_color="#000000")
-        self.thread_controls_frame.pack(side=ctk.TOP, padx=5, pady=5)
-
-        self.proxy_controls_frame = ctk.CTkFrame(self.thread_settings_frame, fg_color="#000000")
-        self.proxy_controls_frame.pack(side=ctk.TOP, padx=5, pady=5)
-
-        self.ua_controls_frame = ctk.CTkFrame(self.thread_settings_frame, fg_color="#000000")
-        self.ua_controls_frame.pack(side=ctk.TOP, padx=5, pady=5)
-
-        ua_label = ctk.CTkLabel(self.ua_controls_frame, text="User-Agent:", text_color="white")
-        ua_label.pack(side=ctk.LEFT, padx=10)
-        self.ua_entry = ctk.CTkEntry(self.ua_controls_frame, width=125, height=25, fg_color="#000000")
-        self.ua_entry.pack(side=ctk.LEFT, padx=10)
-
-
-        proxy_label = ctk.CTkLabel(self.proxy_controls_frame, text="Proxy:", text_color="white")
-        proxy_label.pack(side=ctk.LEFT, padx=27)
-        self.proxy_entry = ctk.CTkEntry(self.proxy_controls_frame, width=125, height=25, fg_color="#000000")
-        self.proxy_entry.pack(side=ctk.LEFT, padx=27)
-
-
-        # Add save results checkbox
-        self.save_results_var = ctk.BooleanVar(value=False)
-        self.save_results_checkbox = ctk.CTkCheckBox(
-            self.thread_settings_frame,
-            text="Save Results",
-            variable=self.save_results_var,
-            text_color="white",
-            fg_color="#14375e",
-            hover_color="#1c4b7e"
-        )
-        self.save_results_checkbox.pack(side=ctk.TOP, padx=10, pady=5)
-
-        self.thread_label = ctk.CTkLabel(self.thread_controls_frame, text="Max Threads:", text_color="white")
-        self.thread_label.pack(side=ctk.LEFT, padx=5)
-        self.thread_entry = ctk.CTkEntry(self.thread_controls_frame, width=125, height=25, fg_color="#000000")
-        self.thread_entry.insert(0, "10")  # Default threads
-        self.thread_entry.pack(side=ctk.LEFT, padx=5)
-
+    def load_icons(self):
+        """Load all icons for use in the application"""
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        icon_path = os.path.join(current_dir, "icons/")
         
-        
+        self.icons = {
+            "start": ctk.CTkImage(Image.open(os.path.join(icon_path, "start.png")), size=(20, 20)),
+            "stop": ctk.CTkImage(Image.open(os.path.join(icon_path, "stop.png")), size=(20, 20)),
+            "logo": ctk.CTkImage(Image.open(os.path.join(icon_path, "logo.png")), size=(100, 100))
+        }
 
-        self.subdomain_tree = ttk.Treeview(self.tabview.tab("Subdomains"), columns=("Domain", "Status Code", "IP", "Server"), show="headings", style="Treeview")
-        self.subdomain_tree.heading("Domain", text="Domain")
-        self.subdomain_tree.heading("Status Code", text="Status Code")  # Match the column name
-        self.subdomain_tree.heading("IP", text="IP")
-        self.subdomain_tree.heading("Server", text="Server")
-        # Optional: Set column widths
-        self.subdomain_tree.column("Domain", width=150)
-        self.subdomain_tree.column("Status Code", width=70)
-        self.subdomain_tree.column("IP", width=100)
-        self.subdomain_tree.column("Server", width=100)
-        # Add scrollbar 
-        self.subdomain_scrollbar = ttk.Scrollbar(self.tabview.tab("Subdomains"), orient="vertical", command=self.subdomain_tree.yview)
-        self.subdomain_tree.configure(yscrollcommand=self.subdomain_scrollbar.set)
-        # Pack the Treeview and scrollbar
-        self.subdomain_tree.pack(side="left", fill="both", expand=True, padx=10, pady=10)
-        self.subdomain_scrollbar.pack(side="right", fill="y")
-
-        self.ports_tree = ttk.Treeview(self.port_services_tabview.tab("Ports"), columns=("Ports"), show="headings", style="Treeview")
-        self.ports_tree.heading("Ports", text="Ports")
-
-        # Optional: Set column widths
-        self.ports_tree.column("Ports", width=150, anchor="center")
-        self.ports_tree.pack(side="right", fill="both")
-
-        self.services_tree = ttk.Treeview(self.port_services_tabview.tab("Services"), columns=("Services"), show="headings", style="Treeview")
-        self.services_tree.heading("Services", text="Services")
-        self.services_tree.column("Services", anchor="center")
-
-        # Optional: Set column widths
-        self.services_tree.column("Services", width=150)
-        self.services_tree.pack(side="right", fill="both")
-
-        # ASN Tree
-        self.asn_tree = ttk.Treeview(self.tabview.tab("ASN"), 
-                                   columns=("Property", "Value"), 
-                                   show="headings", 
-                                   style="Treeview")
-        self.asn_tree.heading("Property", text="Property")
-        self.asn_tree.heading("Value", text="Value")
-        self.asn_tree.pack(side="left", fill="both", expand=True)
-
-        # Headers Tree
-        self.headers_tree = ttk.Treeview(self.tabview.tab("Headers"), 
-                                   columns=("Value", "Key"), 
-                                   show="headings", 
-                                   style="Treeview")
-        self.headers_tree.heading("Value", text="Value")
-        self.headers_tree.heading("Key", text="Key")
-        self.headers_tree.pack(side="left", fill="both", expand=True)
-
-        self.headers_scrollbar = ttk.Scrollbar(self.tabview.tab("Headers"), orient="vertical", command=self.headers_tree.yview)
-        self.headers_tree.configure(yscrollcommand=self.headers_scrollbar.set)
-        self.headers_scrollbar.pack(side="right", fill="y")
-
-        # Javascript Tree
-        self.javascript_tree = ttk.Treeview(self.tabview.tab("JavaScript"), 
-                                   columns=("Files", "Status"), 
-                                   show="headings", 
-                                   style="Treeview")
-        self.javascript_tree.heading("Files", text="Files")
-        self.javascript_tree.heading("Status", text="Status")
-        self.javascript_tree.pack(side="left", fill="both", expand=True)
-        self.javascript_tree.column("Status", anchor="center")
-        self.javascript_tree.column("Files", width=275)
-        self.javascript_scrollbar = ttk.Scrollbar(self.tabview.tab("JavaScript"), orient="vertical", command=self.javascript_tree.yview)
-        self.javascript_tree.configure(yscrollcommand=self.javascript_scrollbar.set)
-        self.javascript_scrollbar.pack(side="right", fill="y")
-
-
-        # Links Tree
-        self.links_tree = ttk.Treeview(self.tabview.tab("Links"), 
-                                   columns=("Links"), 
-                                   show="headings", 
-                                   style="Treeview")
-        self.links_tree.heading("Links", text="Links")
-        self.links_tree.pack(side="left", fill="both", expand=True)
-        self.links_tree.column("Links", width=250)
-        self.links_scrollbar = ttk.Scrollbar(self.tabview.tab("Links"), orient="vertical", command=self.links_tree.yview)
-        self.links_tree.configure(yscrollcommand=self.links_scrollbar.set)
-        self.links_scrollbar.pack(side="right", fill="y")
-
-        # WHOIS Tree
-        self.whois_tree = ttk.Treeview(self.tabview.tab("Whois"), 
-                                   columns=("Content", "Value"), 
-                                   show="headings", 
-                                   style="Treeview")
-        self.whois_tree.heading("Content", text="Content")
-        self.whois_tree.heading("Value", text="Value")
-        self.whois_tree.pack(side="left", fill="both", expand=True)
-        self.whois_tree.column("Content", width=150)
-        self.whois_tree.column("Value", width=250)
-        self.whois_scrollbar = ttk.Scrollbar(self.tabview.tab("Whois"), orient="vertical", command=self.whois_tree.yview)
-        self.whois_tree.configure(yscrollcommand=self.whois_scrollbar.set)
-        self.whois_scrollbar.pack(side="right", fill="y")
-
-
-
-        self.home_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.home_image, 
-                                               corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Home"))
-        self.home_button.pack(side=ctk.LEFT, padx=10, pady=10)
-
-
-        self.settings_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.settings_image, 
-                                               corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Settings"))
-        self.settings_button.pack(side=ctk.LEFT, padx=10, pady=10)
-
-
-        self.subdomains_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.subdomains_image, 
-                                               corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Subdomains"))
-        self.subdomains_button.pack(side=ctk.LEFT, padx=10, pady=10)
-
-  
-        self.asn_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.asn_image, 
-                                               corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("ASN"))
-        self.asn_button.pack(side=ctk.LEFT, padx=10, pady=10)
-   
-        self.headers_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.headers_image, 
-                                               corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Headers"))
-        self.headers_button.pack(side=ctk.LEFT, padx=10, pady=10)
-
-   
-        self.javascript_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.javascript_image, 
-                                               corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("JavaScript"))
-        self.javascript_button.pack(side=ctk.LEFT, padx=10, pady=10)
-
-   
-        self.links_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.links_image, 
-                                               corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Links"))
-        self.links_button.pack(side=ctk.LEFT, padx=10, pady=10)
-
-    
-        self.whois_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.whois_image, 
-                                               corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Whois"))
-        self.whois_button.pack(side=ctk.LEFT, padx=10, pady=10)
-
-        self.check_tools_button = ctk.CTkButton(
-            self.settings_frame,
-            text="Check/Install Tools",
-            command=self.check_tools
+    def create_layout(self):
+        # Main container with grid layout
+        self.main_container = ctk.CTkFrame(
+            self.window, 
+            fg_color=self.colors["background"],
+            corner_radius=0
         )
-        self.check_tools_button.pack(side=ctk.TOP, padx=10, pady=5)
-        
-        self.tools_tree = ttk.Treeview(
-            self.settings_frame,
-            columns=("Tool", "Status", "Description"),
-            show="headings"
+        self.main_container.pack(fill="both", expand=True)
+
+        # Grid configuration - simplified and fixed
+        self.main_container.grid_columnconfigure(1, weight=1)  # Content area
+        self.main_container.grid_columnconfigure(0, weight=0)  # Navigation area
+        self.main_container.grid_rowconfigure(0, weight=1)
+
+    def create_navigation(self):
+        # Navigation container frame
+        self.nav_container = ctk.CTkFrame(
+            self.main_container,
+            fg_color=self.colors["secondary"],
+            corner_radius=0
         )
-        self.tools_tree.heading("Tool", text="Tool")
-        self.tools_tree.heading("Status", text="Status")
-        self.tools_tree.heading("Description", text="Description")
-        self.tools_tree.pack(side=ctk.TOP, padx=10, pady=5)
+        self.nav_container.grid(row=0, column=0, sticky="nsew")
+        
+        # Toggle button at top of nav container
+        self.sidebar_toggle_btn = ctk.CTkButton(
+            self.nav_container,
+            text="☰",
+            fg_color="transparent",
+            hover_color=self.colors["hover"],
+            text_color=self.colors["text"],
+            width=30,
+            height=30,
+            command=self.toggle_sidebar
+        )
+        self.sidebar_toggle_btn.pack(side="top", padx=5, pady=5)
+
+        # Navigation buttons frame
+        self.nav_frame = ctk.CTkFrame(
+            self.nav_container,
+            fg_color="transparent",
+            width=200
+        )
+        self.nav_frame.pack(fill="both", expand=True)
+
+        # Navigation Buttons
+        nav_items = [
+            {"name": "Dashboard", "icon": "home.png", "command": self.show_dashboard},
+            {"name": "Subdomain", "icon": "domains.png", "command": self.show_subdomain_scan},
+            {"name": "Port Scan", "icon": "network.png", "command": self.show_port_scan},
+            {"name": "Headers", "icon": "headers.png", "command": self.show_headers_scan},
+            {"name": "Dork", "icon": "dork.png", "command": self.show_dork_scan},
+            # {"name": "ASN", "icon": "asn.png", "command": self.show_asn_scan},
+            # {"name": "JavaScript", "icon": "javascript.png", "command": self.show_js_scan},
+            {"name": "Settings", "icon": "settings.png", "command": self.show_settings}
+        ]
+
+        for item in nav_items:
+            self.create_nav_button(item)
+
+    def create_nav_button(self, item):
+        """Navigation button with consistent dark theme styling"""
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        icon_path = os.path.join(current_dir, "icons", item["icon"])
+        
+        try:
+            icon = ctk.CTkImage(
+                Image.open(icon_path), 
+                size=(25, 25)
+            )
+        except Exception:
+            icon = None
+
+        button = ctk.CTkButton(
+            self.nav_frame, 
+            text=item["name"],
+            image=icon,
+            fg_color=self.colors["secondary"],
+            text_color=self.colors["text"],
+            hover_color=self.colors["hover"],
+            corner_radius=5,
+            anchor="w"
+        )
+        button.pack(fill="x", padx=5, pady=3)
+
+    def create_content_area(self):
+        """Content area with dark theme styling"""
+        # Main content frame
+        self.content_frame = ctk.CTkFrame(
+            self.main_container, 
+            fg_color=self.colors["background"],
+            corner_radius=0
+        )
+        self.content_frame.grid(row=0, column=1, sticky="nsew")
+
+        # Input area
+        self.input_frame = ctk.CTkFrame(
+            self.content_frame, 
+            fg_color=self.colors["secondary"],
+            border_color=self.colors["border"],
+            border_width=1
+        )
+        self.input_frame.pack(fill="x", padx=10, pady=10)
+
+        # Domain input
+        self.domain_entry = ctk.CTkEntry(
+            self.input_frame, 
+            placeholder_text="Enter domain or IP",
+            width=600,
+            fg_color=self.colors["background"],
+            text_color=self.colors["text"],
+            placeholder_text_color=self.colors["text"],
+            border_color=self.colors["border"]
+        )
+        self.domain_entry.pack(side="left", padx=10, pady=10, expand=True, fill="x")
+
+        # Enhanced scan button with icon
+        self.scan_button = ctk.CTkButton(
+            self.input_frame, 
+            text="Start Scan",
+            image=self.icons["start"],
+            compound="left",
+            fg_color=self.colors["primary"],
+            hover_color=self.colors["accent"],
+            text_color=self.colors["text"]
+        )
+        self.scan_button.pack(side="right", padx=10, pady=10)
+
+        # Add stop button (initially disabled)
+        self.stop_button = ctk.CTkButton(
+            self.input_frame,
+            text="Stop",
+            image=self.icons["stop"],
+            compound="left",
+            fg_color=self.colors["secondary"],
+            hover_color="#FF4444",
+            text_color=self.colors["text"],
+            state="disabled",
+            command=self.stop_scan
+        )
+        self.stop_button.pack(side="right", padx=5, pady=10)
+
+        # Enhanced status bar with pulsing animation
+        self.status_frame = ctk.CTkFrame(
+            self.content_frame,
+            fg_color=self.colors["secondary"],
+            height=30
+        )
+        self.status_frame.pack(fill="x", side="bottom", padx=10, pady=5)
+        self.status_frame.pack_propagate(False)
+
+        self.status_indicator = ctk.CTkLabel(
+            self.status_frame,
+            text="●",
+            text_color=self.colors["primary"],
+            width=20
+        )
+        self.status_indicator.pack(side="left", padx=5)
+
+        self.status_bar = ctk.CTkLabel(
+            self.status_frame,
+            text="Ready to scan",
+            text_color=self.colors["text"],
+            anchor="w"
+        )
+        self.status_bar.pack(side="left", fill="x", expand=True, padx=5)
+
+        # Results area
+        self.results_frame = ctk.CTkFrame(
+            self.content_frame, 
+            fg_color=self.colors["background"],
+            border_color=self.colors["border"],
+            border_width=1
+        )
+        self.results_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Progress bar
+        self.progress_bar = ctk.CTkProgressBar(
+            self.content_frame, 
+            fg_color=self.colors["secondary"],
+            progress_color=self.colors["primary"]
+        )
+        self.progress_bar.pack(fill="x", side="bottom", padx=10, pady=5)
+        self.progress_bar.set(0)
+
+    def setup_theme(self):
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("blue")
+
+    def show_dashboard(self):
+        """Enhanced dashboard with system information"""
+        # Clear previous content
+        for widget in self.results_frame.winfo_children():
+            widget.destroy()
+
+        # Dashboard layout
+        dashboard_frame = ctk.CTkFrame(self.results_frame, fg_color="transparent")
+        dashboard_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Welcome section
+        welcome_label = ctk.CTkLabel(
+            dashboard_frame, 
+            text="Welcome to ReconX",
+            font=("Arial", 24, "bold"),
+            text_color=self.colors["text"]
+        )
+        welcome_label.pack(pady=10)
+
+        # Quick stats or system info
+        info_frame = ctk.CTkFrame(dashboard_frame, fg_color=self.colors["secondary"])
+        info_frame.pack(fill="x", pady=10)
+
+        # Example system info (you can expand this)
+        info_items = [
+            f"Python Version: {sys.version.split()[0]}",
+            f"Available Scan Modules: 3",
+            "Last Scan: Not available"
+        ]
+
+        for item in info_items:
+            info_label = ctk.CTkLabel(
+                info_frame, 
+                text=item, 
+                text_color=self.colors["text"],
+                anchor="w"
+            )
+            info_label.pack(fill="x", padx=10, pady=5)
+
+    def create_results_treeview(self):
+        """Create a standard treeview for results"""
+        # Clear existing widgets
+        for widget in self.results_frame.winfo_children():
+            widget.destroy()
+
+        # Create Treeview
+        self.results_tree = ttk.Treeview(
+            self.results_frame, 
+            style="Treeview"
+        )
+        self.results_tree.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(
+            self.results_frame, 
+            orient="vertical", 
+            command=self.results_tree.yview
+        )
+        scrollbar.pack(side="right", fill="y")
+        self.results_tree.configure(yscrollcommand=scrollbar.set)
+
+    def show_subdomain_scan(self):
+        """Prepare UI for subdomain scanning"""
+        self.create_results_treeview()
+        
+        # Configure treeview columns
+        self.results_tree['columns'] = ("Domain", "Status Code", "IP", "Server")
+        self.results_tree.heading("Domain", text="Domain")
+        self.results_tree.heading("Status Code", text="Status Code")
+        self.results_tree.heading("IP", text="IP")
+        self.results_tree.heading("Server", text="Server")
+
+        # Update scan button
+        self.scan_button.configure(command=self.start_subdomain_scan)
+        self.current_scan_type = "subdomain"
+
+    def start_subdomain_scan(self):
+        """Start subdomain enumeration with status monitoring"""
+        domain = self.domain_entry.get()
+        if not domain:
+            messagebox.showerror("Error", "Please enter a domain")
+            return
+
+        # Clear existing items
+        for item in self.results_tree.get_children():
+            self.results_tree.delete(item)
+
+        # Start status monitoring
+        self.start_status_monitoring()
+
+        # Start scanning in a thread
+        threading.Thread(target=self._run_subdomain_scan, args=(domain,), daemon=True).start()
+
+    def _run_subdomain_scan(self, domain):
+        """Enhanced subdomain scanning with detailed progress"""
+        try:
+            # Initial status update
+            self.status_queue.put({'type': 'message', 'text': f'Starting subdomain scan for {domain}'})
+            self.status_queue.put({'type': 'progress', 'value': 0.1})
+
+            enumerator = SubdomainEnumerator(domain)
+            subdomains = list(enumerator.enumerate())
+            total_subdomains = len(subdomains)
+
+            # Update progress and status
+            self.status_queue.put({'type': 'message', 'text': f'Found {total_subdomains} potential subdomains'})
+            self.status_queue.put({'type': 'progress', 'value': 0.3})
+
+            # Process subdomains
+            processed_count = 0
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                future_to_subdomain = {
+                    executor.submit(self._process_subdomain, subdomain): subdomain 
+                    for subdomain in subdomains
+                }
+                
+                for future in as_completed(future_to_subdomain):
+                    result = future.result()
+                    processed_count += 1
+                    
+                    # Update progress
+                    progress = 0.3 + (processed_count / total_subdomains * 0.6)
+                    self.status_queue.put({
+                        'type': 'message', 
+                        'text': f'Processed {processed_count}/{total_subdomains} subdomains'
+                    })
+                    self.status_queue.put({'type': 'progress', 'value': progress})
+
+                    if result:
+                        self.window.after(0, self._update_subdomain_tree, result)
+
+            # Scan complete
+            self.status_queue.put({'type': 'complete'})
+            self.status_queue.put({'type': 'message', 'text': f'Subdomain scan completed. Found active subdomains.'})
+
+        except Exception as e:
+            self.status_queue.put({'type': 'message', 'text': f'Scan Error: {str(e)}'})
+            messagebox.showerror("Scan Error", str(e))
+
+    def _process_subdomain(self, subdomain):
+        """Process individual subdomain"""
+        try:
+            response = requests.get(f"https://{subdomain}", timeout=5)
+            ip = socket.gethostbyname(subdomain)
+            return (subdomain, response.status_code, ip, response.headers.get("Server", "N/A"))
+        except Exception:
+            return None
+
+    def _update_subdomain_tree(self, result):
+        """Update treeview with subdomain result"""
+        self.results_tree.insert("", "end", values=result)
+
+    def show_port_scan(self):
+        """Prepare UI for port scanning"""
+        self.create_results_treeview()
+        
+        # Configure treeview columns
+        self.results_tree['columns'] = ("Ports", "Services")
+        self.results_tree.heading("Ports", text="Ports")
+        self.results_tree.heading("Services", text="Services")
+
+        # Update scan button
+        self.scan_button.configure(command=self.start_port_scan)
+        self.current_scan_type = "port"
+
+    def start_port_scan(self):
+        """Start port scanning"""
+        host = self.domain_entry.get()
+        if not host:
+            messagebox.showerror("Error", "Please enter a host")
+            return
+
+        # Clear existing items
+        for item in self.results_tree.get_children():
+            self.results_tree.delete(item)
+
+        # Start status monitoring
+        self.start_status_monitoring()
+        
+        # Initialize scanner
+        scanner = PortScanner(self.status_queue)
+        
+        def run_scan():
+            try:
+                results = scanner.scan(host)
+                for result in results:
+                    self.window.after(0, self._update_port_tree, result)
+            except Exception as e:
+                self.window.after(0, lambda: messagebox.showerror("Scan Error", str(e)))
+            finally:
+                self.window.after(0, self.stop_scan)
+        
+        # Start scan in thread
+        threading.Thread(target=run_scan, daemon=True).start()
+
+    def _update_port_tree(self, result):
+        """Update treeview with port result"""
+        self.results_tree.insert("", "end", values=result)
+
+    def show_headers_scan(self):
+        """Prepare UI for headers scanning"""
+        self.create_results_treeview()
+        
+        # Configure treeview columns
+        self.results_tree['columns'] = ("Header", "Value")
+        self.results_tree.heading("Header", text="Header")
+        self.results_tree.heading("Value", text="Value")
+
+        # Update scan button
+        self.scan_button.configure(command=self.start_headers_scan)
+        self.current_scan_type = "headers"
+
+    def start_headers_scan(self):
+        """Start headers scanning"""
+        domain = self.domain_entry.get()
+        if not domain:
+            messagebox.showerror("Error", "Please enter a domain")
+            return
+
+        # Clear existing items
+        for item in self.results_tree.get_children():
+            self.results_tree.delete(item)
+
+        # Start status monitoring
+        self.start_status_monitoring()
+        
+        # Initialize scanner
+        scanner = HeaderScanner(self.status_queue)
+        
+        def run_scan():
+            try:
+                results = scanner.scan(domain)
+                for result in results:
+                    self.window.after(0, self._update_headers_tree, result)
+            except Exception as e:
+                self.window.after(0, lambda: messagebox.showerror("Scan Error", str(e)))
+            finally:
+                self.window.after(0, self.stop_scan)
+        
+        # Start scan in thread
+        threading.Thread(target=run_scan, daemon=True).start()
+
+    def _update_headers_tree(self, result):
+        """Update treeview with headers result"""
+        self.results_tree.insert("", "end", values=result)
+
+    # Add similar methods for ASN, JS, and other scans...
+
+    def show_settings(self):
+        """Show settings panel"""
+        # Clear previous content
+        for widget in self.results_frame.winfo_children():
+            widget.destroy()
+
+        # Settings label
+        settings_label = ctk.CTkLabel(
+            self.results_frame, 
+            text="Settings",
+            font=("Arial", 24, "bold"),
+            text_color=self.colors["text"]
+        )
+        settings_label.pack(pady=20)
+
+    def update_status(self):
+        """Enhanced status updates with visual feedback"""
+        try:
+            while not self.status_queue.empty():
+                status = self.status_queue.get_nowait()
+                
+                if status['type'] == 'progress':
+                    self.progress_bar.set(status['value'])
+                    
+                elif status['type'] == 'message':
+                    if 'error' in status.get('text', '').lower():
+                        self.status_indicator.configure(text_color="#FF4444")
+                        self.status_bar.configure(text_color="#FF4444")
+                    elif 'complete' in status.get('text', '').lower():
+                        self.status_indicator.configure(text_color="#4CAF50")
+                        self.status_bar.configure(text_color="#4CAF50")
+                    else:
+                        self.status_indicator.configure(text_color=self.colors["primary"])
+                        self.status_bar.configure(text_color=self.colors["text"])
+                    
+                    self.status_bar.configure(text=status['text'])
+                    
+                elif status['type'] == 'complete':
+                    self.progress_bar.set(1)
+                    self.stop_scan()
+                    threading.Timer(1, self.reset_progress).start()
+                    
+        except queue.Empty:
+            pass
+
+        if self.is_scanning:
+            self.status_update_id = self.window.after(100, self.update_status)
 
     def stop_scan(self):
-        """Stop any running scan"""
+        """Stop scanning with visual feedback"""
         self.is_scanning = False
-        self.progress_label.configure(text="Scan stopped by user")
-        self.stop_button.configure(state=ctk.DISABLED)
-        self.button.configure(state=ctk.NORMAL)
-        self.clear_button.configure(state=ctk.NORMAL)
+        self.stop_button.configure(state="disabled")
+        self.scan_button.configure(state="normal")
+        self.status_indicator.configure(text_color=self.colors["text"])
+        self.status_bar.configure(
+            text="Scan stopped",
+            text_color=self.colors["text"]
+        )
 
-    def start_scan(self):
-        """Common method to start any scan"""
-        self.is_scanning = True
-        self.button.configure(state=ctk.DISABLED)
-        self.clear_button.configure(state=ctk.DISABLED)
-        self.stop_button.configure(state=ctk.NORMAL)
-
-    def animate_waiting(self):
-        """Animate the waiting text"""
-        if self.progress_label.cget("text").startswith("Waiting for input"):
-            self.current_frame = (self.current_frame + 1) % len(self.waiting_frames)
-            self.progress_label.configure(text=self.waiting_frames[self.current_frame])
-        self.window.after(500, self.animate_waiting) 
-
-    def switch_tab(self, tab_name):
-        """Switch to the specified tab"""
-        try:
-            self.tabview.set(tab_name)
-            
-            # Optional: Update button appearances to show active state
-            buttons = {
-                "Home": self.home_button,
-                "Subdomains": self.subdomains_button,
-                "ASN": self.asn_button,
-                "Headers": self.headers_button,
-                "Links": self.links_button,
-                "JS Files": self.javascript_button,
-                "Whois": self.whois_button
-            }
-            
-            # Reset all buttons to default state
-            for button in buttons.values():
-                button.configure(fg_color="transparent")
-            
-            # Highlight active button
-            if tab_name in buttons:
-                buttons[tab_name].configure(fg_color="#14375e")
-                
-        except Exception as e:
-            print(f"Error switching to tab {tab_name}: {e}")
-
-    def check_selected(self):
-        if self.menu.get() == "Headers":
-            self.headers_thread()
-        elif self.menu.get() == "Subdomains":
-            self.subdomain_thread()
-        elif self.menu.get() == "Port Scan":
-            self.ports_thread()
-        elif self.menu.get() == "ASN":
-            self.asn_thread()
-        elif self.menu.get() == "Headers":
-            self.get_headers()
-        elif self.menu.get() == "JavaScript":
-            self.javascript_thread()
-        elif self.menu.get() == "Links":
-            self.links_thread()
-        elif self.menu.get() == "Whois":
-            self.whois_thread()
-
-    def is_valid_domain(self, domain):
-        """
-        Validate if the input is a valid domain name.
-        Returns True if valid, False otherwise.
-        """
-        # First clean the domain
-        domain = domain.strip()
-        domain = domain.replace("https://", "").replace("http://", "").replace("www.", "")
+    def reset_progress(self):
+        """Enhanced progress reset with visual feedback"""
+        self.progress_bar.set(0)
+        self.is_scanning = False
+        self.stop_button.configure(state="disabled")
+        self.scan_button.configure(state="normal")
+        self.status_indicator.configure(text_color="#4CAF50")
+        self.status_bar.configure(
+            text="Scan completed successfully",
+            text_color="#4CAF50"
+        )
         
-        # Domain validation regex pattern
-        pattern = r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
-        
-        try:
-            # Check if the domain matches the pattern
-            if not re.match(pattern, domain):
-                return False
-            
-            # Try to resolve the domain
-            socket.gethostbyname(domain)
-            return True
-        except socket.gaierror:
-            return False
-
-    def process_link(self, link):
-        """Process individual link and return formatted result"""
-        try:
-            href = link.get('href')
-            if href.startswith('//'):
-                href = f'https:{href}'
-            elif href.startswith('/'):
-                base_domain = self.entry.get().replace('https://', '').replace('http://', '')
-                href = f'https://{base_domain}{href}'
-            elif not href.startswith(('http://', 'https://')):
-                base_domain = self.entry.get().replace('https://', '').replace('http://', '')
-                href = f'https://{base_domain}/{href}'
-            return href
-        except Exception as e:
-            print(f"Error processing link: {e}")
-            return None
-        
-    def process_whois_data(self, key, value):
-        """Process individual whois data entries with better formatting"""
-        try:
-            # Handle lists
-            if isinstance(value, list):
-                # Join list items with newlines, handle nested structures
-                formatted_items = []
-                for item in value:
-                    if isinstance(item, (dict, list)):
-                        formatted_items.append(self.format_complex_value(item))
-                    else:
-                        formatted_items.append(str(item))
-                value = "\n".join(formatted_items)
-            
-            # Handle dictionaries
-            elif isinstance(value, dict):
-                value = self.format_complex_value(value)
-            
-            # Handle dates
-            elif "datetime.datetime" in str(type(value)):
-                value = value.strftime("%Y-%m-%d %H:%M:%S")
-            
-            # Handle all other types
-            else:
-                value = str(value)
-            
-            return key, value
-
-        except Exception as e:
-            print(f"Error processing whois data {key}: {e}")
-            return key, "Error processing"
-
-    def format_complex_value(self, value):
-        """Format complex data structures (dicts/nested) into readable string"""
-        if isinstance(value, dict):
-            formatted_items = []
-            for k, v in value.items():
-                if isinstance(v, (dict, list)):
-                    v = self.format_complex_value(v)
-                formatted_items.append(f"{k}: {v}")
-            return "\n".join(formatted_items)
-        
-        elif isinstance(value, list):
-            for item in value:
-                return ",".join(map(str, item))
-        
-        return str(value)
-
-    def whois(self):
-        try:
-            domain = self.entry.get()
-            self.button.configure(state=ctk.DISABLED)
-            self.clear_button.configure(state=ctk.DISABLED)
-            
-            # Clear existing entries
-            for item in self.whois_tree.get_children():
-                self.whois_tree.delete(item)
-                
-            self.progress_bar.start()
-            self.progress_label.configure(text="Getting WHOIS information...")
-
-            if not domain:
-                messagebox.showerror("Error", "Please enter a domain")
-                return
-            
-            # Validate domain first
-            if not self.is_valid_domain(domain):
-                messagebox.showerror("Error", "Please enter a valid domain name")
-                self.progress_bar.stop()
-                self.progress_label.configure(text="Waiting for input...")
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
-                return
-
-            try:
-                self.start_scan()
-                # Clean domain
-                domain = domain.replace("https://", "").replace("http://", "").replace("www.", "")
-                
-                # Get both WHOIS and RDAP information
-                host = socket.gethostbyname(domain)
-                
-                # Get domain WHOIS
-                w = whois.whois(domain)
-                whois_data = w.copy()
-                
-                # Get RDAP data
-                obj = IPWhois(host)
-                rdap_results = obj.lookup_rdap(depth=1)
-                
-                # Combine both results
-                combined_data = {**whois_data, **rdap_results}
-                
-                # Filter out None values and process data concurrently
-                filtered_data = {k: v for k, v in combined_data.items() if v is not None}
-                total_items = len(filtered_data)
-                processed = 0
-
-                self.progress_label.configure(text=f"Processing 0/{total_items} WHOIS entries...")
-
-                max_threads = int(self.thread_entry.get())
-                with ThreadPoolExecutor(max_workers=max_threads) as executor:
-                    future_to_data = {
-                        executor.submit(self.process_whois_data, key, value): (key, value)
-                        for key, value in filtered_data.items()
-                    }
-
-                    for future in as_completed(future_to_data):
-                        if not self.is_scanning:
-                            executor.shutdown(wait=False)
-                            break
-                            
-                        processed += 1
-                        self.progress_label.configure(
-                            text=f"Processing {processed}/{total_items} WHOIS entries..."
-                        )
-                        
-                        try:
-                            key, value = future.result()
-                            if key and value:
-                                self.whois_tree.insert("", "end", values=(key, value))
-                        except Exception as e:
-                            print(f"Error processing future: {e}")
-
-                self.save_scan_results("whois", None)
-                self.progress_bar.stop()
-                self.progress_label.configure(text=f"Done! Found {len(self.whois_tree.get_children())} WHOIS entries")
-
-            except Exception as e:
-                self.progress_bar.stop()
-                self.progress_label.configure(text=f"Error: {str(e)}")
-                messagebox.showerror("Error", str(e))
-
-        finally:
-            self.is_scanning = False
-            self.stop_button.configure(state=ctk.DISABLED)
-            self.button.configure(state=ctk.NORMAL)
-            self.clear_button.configure(state=ctk.NORMAL)
-
-
-    def get_links(self):
-        try:
-            domain = self.entry.get()
-            self.button.configure(state=ctk.DISABLED)
-            self.clear_button.configure(state=ctk.DISABLED)
-            for item in self.links_tree.get_children():
-                self.links_tree.delete(item)
-            self.progress_bar.start()
-            self.progress_label.configure(text="Getting links...")
-
-            if self.entry.get() == "":
-                messagebox.showerror("Error", "Please enter a host")
-                self.progress_bar.stop()
-                self.progress_label.configure(text="Waiting for input...")
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
-
-            if "https://" not in domain:
-                domain = f"https://{domain}"
-
-
-            # Validate domain first
-            if not self.is_valid_domain(domain):
-                messagebox.showerror("Error", "Please enter a valid domain name")
-                self.progress_bar.stop()
-                self.progress_label.configure(text="Waiting for input...")
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
-                return
-
-            try:
-                self.start_scan()
-                s = requests.Session()
-                proxy = self.proxy_entry.get()
-                user_agent = self.ua_entry.get()
-                if user_agent:
-                    s.headers["User-Agent"] = user_agent
-                if proxy:
-                    s.proxies = {"http": proxy, "https": proxy}
-                    r = s.get(domain, verify=False, proxies=s.proxies)
-                elif user_agent:
-                    r = s.get(domain, verify=False, headers={"User-Agent": user_agent})
-                elif user_agent and proxy:
-                    r = s.get(domain, verify=False, headers={"User-Agent": user_agent}, proxies={"http": proxy, "https": proxy})
-                else:
-                    r = s.get(domain, verify=False)
-
-                soup = BeautifulSoup(r.content, "html.parser")
-                links = soup.find_all('a', href=True)
-
-                total_links = len(links)
-                processed = 0
-                self.progress_label.configure(text=f"Processing 0/{total_links} links...")
-
-                max_threads = int(self.thread_entry.get()) 
-                with ThreadPoolExecutor(max_workers=max_threads) as executor:
-                    future_to_link = {
-                        executor.submit(self.process_link, link): link 
-                        for link in links
-                    }
-
-                    for future in as_completed(future_to_link):
-                        if not self.is_scanning:
-                            executor.shutdown(wait=False)
-                            break
-
-                        processed += 1
-                        self.progress_label.configure(text=f"Processing {processed}/{total_links} links...")
-                        
-                        result = future.result()
-                        print(result)
-                        if result:
-                            self.links_tree.insert("", "end", values=(result,))
-
-                self.save_scan_results("links", None)
-                self.progress_bar.stop()
-                self.progress_label.configure(text=f"Done! Found {len(self.links_tree.get_children())} links")
-
-            except Exception as e:
-                self.progress_bar.stop()
-                print(f"{e}")
-                #self.progress_label.configure(text=f"Error: {str(e)}")
-
-        finally:
-            self.is_scanning = False
-            self.stop_button.configure(state=ctk.DISABLED)
-            self.button.configure(state=ctk.NORMAL)
-            self.clear_button.configure(state=ctk.NORMAL)
-
-
-
-    def get_javascript_files(self):
-        """Retrieve JavaScript files from a domain."""
-        try:
-            domain = self.entry.get()
-            self.button.configure(state=ctk.DISABLED)
-            self.clear_button.configure(state=ctk.DISABLED)
-            for item in self.javascript_tree.get_children():
-                self.javascript_tree.delete(item)
-            self.progress_bar.start()
-            self.progress_label.configure(text="Getting JavaScript files...")
-
-            # Clean up domain input
-            if "https://" in domain:
-                domain = domain.replace("https://", "")
-            if "https://www." in domain:
-                domain = domain.replace("https://www.", "")
-            if "http://" in domain:
-                domain = domain.replace("http://", "")
-            if "http://www." in domain:
-                domain = domain.replace("http://www.", "")
-            if domain == "":
-                messagebox.showerror("Error", "Please enter a domain")
-                self.progress_bar.stop()
-                self.progress_label.configure(text="Waiting for input...")
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
-                return
-            
-            # Validate domain first
-            if not self.is_valid_domain(domain):
-                messagebox.showerror("Error", "Please enter a valid domain name")
-                self.progress_bar.stop()
-                self.progress_label.configure(text="Waiting for input...")
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
-                return
-
-            # Fetch the main page
-            url = f"https://{domain}"
-            s = requests.Session()
-            proxy = self.proxy_entry.get()
-            s.proxies = {"http": proxy, "https": proxy}
-            if proxy:
-                response = s.get(url, verify=False, proxies=s.proxies)
-            else:
-                response = s.get(url, verify=False)
-            soup = BeautifulSoup(response.content, "html.parser")
-
-            # Find all script tags
-            scripts = [script.get("src") for script in soup.find_all("script") if script.get("src")]
-            js_urls = re.findall(r'url\([\'"]?(.*?\.js)[\'"]?\)', response.text)
-            for urls in js_urls:
-                full_domain = urljoin(domain, urls)
-                scripts.append(full_domain)
-                print(full_domain)
-
-            # Update progress label with total count
-            total_scripts = len(scripts)
-            processed = 0
-            self.progress_label.configure(text=f"Processing 0/{total_scripts} JavaScript files...")
-
-            # Download JavaScript files concurrently
-            try:
-                self.start_scan()
-                max_threads = int(self.thread_entry.get())
-                with ThreadPoolExecutor(max_workers=max_threads) as executor:
-                    future_to_script = {
-                        executor.submit(self.download_script, url, script): script
-                        for script in scripts
-                    }
-
-                    for future in as_completed(future_to_script):
-                        if not self.is_scanning:
-                            executor.shutdown(wait=False)
-                            break
-                        script = future_to_script[future]
-                        try:
-                            status = future.result()
-                            self.javascript_tree.insert("", "end", values=(script, status))
-                            processed += 1
-                            self.progress_label.configure(
-                                text=f"Processing {processed}/{total_scripts} JavaScript files..."
-                            )
-                        except Exception as e:
-                            print(f"Error downloading {script}: {e}")
-                
-                self.save_scan_results("javascript", None)
-                self.progress_bar.stop()
-                self.progress_label.configure(
-                    text=f"Done! Processed {processed} JavaScript files"
-                )
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
-            finally:
-                self.is_scanning = False
-                self.stop_button.configure(state=ctk.DISABLED)
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
-
-
-
-        except Exception as e:
-            self.progress_bar.stop()
-            self.progress_label.configure(text="Error")
-            self.button.configure(state=ctk.NORMAL)
-            self.clear_button.configure(state=ctk.NORMAL)
-            print(f"Main error: {e}")
-
-    def download_script(self, base_url, script_url):
-        """Download a JavaScript file and return its status."""
-        try:
-            if not script_url.startswith("http"):
-                script_url = f"{base_url}/{script_url.lstrip('/')}"
-            s = requests.Session()
-            proxy = self.proxy_entry.get()
-            s.proxies = {"http": proxy, "https": proxy}
-            if proxy:
-                response = requests.get(script_url, verify=False, proxies=s.proxies)
-            else:
-                response = requests.get(script_url, verify=False)
-            if response.status_code == 200:
-                return response.status_code
-            else:
-                return f"{response.status_code}"
-        except Exception as e:
-            return f"Error: {str(e)}"
-
-
-    def get_asn_info(self):
-        """Get ASN information for a domain"""
-        try:
-            domain = self.entry.get()
-            self.button.configure(state=ctk.DISABLED)
-            self.clear_button.configure(state=ctk.DISABLED)
-            self.progress_bar.start()
-            self.progress_label.configure(text="Getting ASN info...")
-
-            if self.entry.get() == "":
-                messagebox.showerror("Error", "Please enter a host")
-                self.progress_bar.stop()
-                self.progress_label.configure(text="Waiting for input...")
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
-
-            # Validate domain first
-            if not self.is_valid_domain(domain):
-                messagebox.showerror("Error", "Please enter a valid domain name")
-                self.progress_bar.stop()
-                self.progress_label.configure(text="Waiting for input...")
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
-                return
-
-            # Get IP address from domain
-            ip = socket.gethostbyname(domain)
-            
-            # Get ASN info
-            obj = IPWhois(ip)
-            results = obj.lookup_rdap(depth=1)
-            
-            # Extract relevant ASN information
-            asn_info = {
-                'ASN': results.get('asn', 'N/A'),
-                'ASN Description': results.get('asn_description', 'N/A'),
-                'Organization': results.get('network', {}).get('name', 'N/A'),
-                'Country': results.get('asn_country_code', 'N/A')
-            }
-
-            # Clear existing items
-            for item in self.asn_tree.get_children():
-                self.asn_tree.delete(item)
-
-            # Add ASN info to tree
-            for prop, value in asn_info.items():
-                self.asn_tree.insert("", "end", values=(prop, value))
-            
-            self.save_scan_results("asn", None)
-            self.progress_bar.stop()
-            self.progress_label.configure(text="ASN info retrieved successfully!")
-            self.button.configure(state=ctk.NORMAL)
-            self.clear_button.configure(state=ctk.NORMAL)
-
-        except Exception as e:
-            self.progress_bar.stop()
-            self.progress_label.configure(text=f"Error: {str(e)}")
-            self.button.configure(state=ctk.NORMAL)
-            self.clear_button.configure(state=ctk.NORMAL)
-
-    def scan_port(self, host, port):
-        """Scan a single port and identify its service."""
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.settimeout(1)
-                result = sock.connect_ex((host, port))
-                if result == 0:
-                    try:
-                        service = socket.getservbyport(port)
-                    except:
-                        service = "unknown"
-                    return port, service
-        except Exception as e:
-            print(f"Error scanning port {port}: {e}")
-        return None
-
-    def scan_ports(self):
-            """Scan ports and update both ports and services trees."""
-            host = self.entry.get()
-            host = socket.gethostbyname(host)
-
-            if self.entry.get() == "":
-               messagebox.showerror("Error", "Please enter a host")
-               self.progress_bar.stop()
-               self.progress_label.configure(text="Waiting for input...")
-               self.button.configure(state=ctk.NORMAL)
-               self.clear_button.configure(state=ctk.NORMAL)
-               return
-            elif self.startport_entry.get() == "" or self.endport_entry.get() == "":
-                messagebox.showerror("Error", "Please enter a start and end port")
-                self.progress_bar.stop()
-                self.progress_label.configure(text="Waiting for input...")
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
-                return
-            
-            # Clear existing entries
-            for tree in [self.ports_tree, self.services_tree]:
-                for item in tree.get_children():
-                    tree.delete(item)
-                    
-            self.button.configure(state=ctk.DISABLED)
-            self.clear_button.configure(state=ctk.DISABLED)
-            self.progress_bar.start()
-
-            try:    
-                total_ports = int(self.endport_entry.get())
-                start_port = int(self.startport_entry.get())
-            except ValueError:
-                messagebox.showerror("Error", "It needs to be an integer")
-                self.progress_bar.stop()
-                self.progress_label.configure(text="Waiting for input...")
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
-                return
-
-            if total_ports == "" or start_port == "":
-                messagebox.WARNING("Don't leave the port entries blank")
-
-            scanned = 0
-            open_ports = []
-
-            try:
-                self.start_scan()
-
-                max_threads = int(self.thread_entry.get())
-                with ThreadPoolExecutor(max_workers=max_threads) as executor:
-                    futures = {executor.submit(self.scan_port, host, port): port for port in range(start_port, total_ports)}
-                    for future in as_completed(futures):
-                        if not self.is_scanning:
-                            executor.shutdown(wait=False)
-                            break
-                        scanned += 1
-                        self.progress_label.configure(text=f"Scanning ports... ({scanned}/{total_ports-1})")
-                        
-                        result = future.result()
-                        if result:
-                            port, service = result
-                            open_ports.append(port)
-                            self.ports_tree.insert("", "end", values=(port,))
-                            self.services_tree.insert("", "end", values=(f"{service}"))
-                
-                self.save_scan_results("ports", None)
-                self.progress_bar.stop()
-                self.progress_label.configure(text=f"Done! Found {len(open_ports)} open ports")
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
-            finally:
-                self.is_scanning = False
-                self.stop_button.configure(state=ctk.DISABLED)
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
-
-
-
-    def get_headers(self):
-        try:
-            domain = self.entry.get()
-            self.button.configure(state=ctk.DISABLED)
-            self.clear_button.configure(state=ctk.DISABLED)
-            self.progress_bar.start()
-            self.progress_label.configure(text="Getting headers...")
-            if "https://" in domain:
-                domain = domain.replace("https://", "")
-            if "https://www." in domain:
-                domain = domain.replace("https://www.", "")
-            if "http://" in domain:
-                domain = domain.replace("http://", "")
-            if "http://www." in domain:
-                domain = domain.replace("http://www.", "")
-            if domain == "":
-                messagebox.showerror("Error", "Please enter a domain")
-
-            # Validate domain first
-            if not self.is_valid_domain(domain):
-                messagebox.showerror("Error", "Please enter a valid domain name")
-                self.progress_bar.stop()
-                self.progress_label.configure(text="Waiting for input...")
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
-                return
-
-            s = requests.Session()
-            proxy = self.proxy_entry.get()
-            s.proxies = {"http": proxy, "https": proxy}
-            if proxy:
-                r = s.get(f"https://{domain}", verify=False, proxies=s.proxies)
-            else:
-                r = s.get(f"https://{domain}", verify=False)
-            for header, value in r.headers.items():
-                self.headers_tree.insert("", "end", values=(header, value))
-            self.save_scan_results("headers", None)
-            self.progress_bar.stop()
-            self.progress_label.configure(text="Done!")
-            self.button.configure(state=ctk.NORMAL)
-            self.clear_button.configure(state=ctk.NORMAL)
-        except Exception as e:
-            self.progress_bar.stop()
-            self.progress_label.configure(text="Error")
-            self.button.configure(state=ctk.NORMAL)
-            self.clear_button.configure(state=ctk.NORMAL)
-
-
-    def process_subdomain(self, subdomain):
-        """Helper function to process individual subdomains"""
-        try:
-            s = requests.Session()
-            proxy = self.proxy_entry.get()
-            s.proxies = {"http": proxy, "https": proxy}
-            if proxy:
-                r = s.get(f"https://{subdomain}", verify=False, timeout=5, proxies=s.proxies)
-            else:
-                r = s.get(f"https://{subdomain}", verify=False, timeout=5)
-            ip = socket.gethostbyname(subdomain)
-            return (subdomain, r.status_code, ip, r.headers.get("Server"))
-        except Exception as e:
-            print(f"Error processing {subdomain}: {e}")
-            return (subdomain, "Error", str(e)[:50], "N/A")
-
-    def get_subdomains(self):
-        try:
-            domain = self.entry.get()
-            self.button.configure(state=ctk.DISABLED)
-            self.clear_button.configure(state=ctk.DISABLED)
-            for item in self.subdomain_tree.get_children():
-                self.subdomain_tree.delete(item)
-            self.progress_bar.start()
-            self.progress_label.configure(text="Getting subdomains...")
-
-            if not domain:
-                messagebox.showerror("Error", "Please enter a domain")
-                return
-            
-            domain = domain.replace("https://", "").replace("http://", "").replace("www.", "")
-            
-            # Validate domain
-            if not self.is_valid_domain(domain):
-                messagebox.showerror("Error", "Please enter a valid domain name")
-                return
-
-            try:
-                self.start_scan()
-                
-                # Initialize enumerator
-                enumerator = SubdomainEnumerator(
-                    domain,
-                    proxy=self.proxy_entry.get(),
-                    user_agent=self.ua_entry.get()
-                )
-                
-                # Get max threads from settings
-                max_threads = int(self.thread_entry.get())
-                
-                # Run enumeration
-                subdomains = enumerator.enumerate(max_threads=max_threads)
-                
-                # Process results
-                total = len(subdomains)
-                processed = 0
-                
-                self.progress_label.configure(text=f"Processing {processed}/{total} subdomains...")
-                
-                # Process each subdomain
-                with ThreadPoolExecutor(max_workers=max_threads) as executor:
-                    future_to_subdomain = {
-                        executor.submit(self.process_subdomain, subdomain): subdomain 
-                        for subdomain in subdomains
-                    }
-                    
-                    for future in as_completed(future_to_subdomain):
-                        if not self.is_scanning:
-                            executor.shutdown(wait=False)
-                            break
-                            
-                        processed += 1
-                        self.progress_label.configure(
-                            text=f"Processing {processed}/{total} subdomains..."
-                        )
-                        
-                        result = future.result()
-                        if result:
-                            self.subdomain_tree.insert("", "end", values=result)
-                
-                if self.save_results_var.get():
-                    enumerator.save_results(domain, subdomains)
-                    
-                self.progress_label.configure(
-                    text=f"Done! Found {len(self.subdomain_tree.get_children())} subdomains"
-                )
-                
-            except Exception as e:
-                self.progress_label.configure(text=f"Error: {str(e)}")
-                messagebox.showerror("Error", str(e))
-                
-        finally:
-            self.progress_bar.stop()
-            self.is_scanning = False
-            self.stop_button.configure(state=ctk.DISABLED)
-            self.button.configure(state=ctk.NORMAL)
-            self.clear_button.configure(state=ctk.NORMAL)
-
-    def clear_textbox(self):
-        if self.menu.get() == "Subdomain":
-            self.subdomain_tree.delete(*self.subdomain_tree.get_children())
-        if self.menu.get() == "Port Scan":
-            self.ports_tree.delete(*self.ports_tree.get_children())
-            self.services_tree.delete(*self.services_tree.get_children())
-        if self.menu.get() == "ASN":
-            self.asn_tree.delete(*self.asn_tree.get_children())
-        self.progress_label.configure(text="Waiting for input...")
-        if self.menu.get() == "JavaScript":
-            self.javascript_tree.delete(*self.javascript_tree.get_children())
-        self.progress_label.configure(text="Waiting for input...")
-        if self.menu.get() == "Headers":
-            self.headers_tree.delete(*self.headers_tree.get_children())
-            self.progress_label.configure(text="Waiting for input...")
-        if self.menu.get() == "Links":
-            self.links_tree.delete(*self.links_tree.get_children())
-            self.progress_label.configure(text="Waiting for input...")
-
-    def subdomain_thread(self):
-        threading.Thread(target=self.get_subdomains).start()
-    
-    def headers_thread(self):
-        threading.Thread(target=self.get_headers).start()
-
-    def ports_thread(self):
-        threading.Thread(target=self.scan_ports).start()
-
-    def asn_thread(self):
-        threading.Thread(target=self.get_asn_info).start()
-
-    def javascript_thread(self):
-        threading.Thread(target=self.get_javascript_files).start()
-
-    def links_thread(self):
-        threading.Thread(target=self.get_links).start()
-
-    def whois_thread(self):
-        threading.Thread(target=self.whois).start()
-
-    def save_scan_results(self, scan_type, results):
-        """Save scan results to a file if checkbox is checked"""
-        if not self.save_results_var.get():
-            return
-            
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        domain = self.entry.get().replace("https://", "").replace("http://", "").replace("/", "_")
-        filename = f"results/{domain}_{scan_type}_{timestamp}.txt"
-        
-        # Create results directory if it doesn't exist
-        os.makedirs("results", exist_ok=True)
-        
-        try:
-            with open(filename, "w") as f:
-                if scan_type == "subdomains":
-                    for item in self.subdomain_tree.get_children():
-                        values = self.subdomain_tree.item(item)["values"]
-                        f.write(f"Domain: {values[0]}, Status: {values[1]}, IP: {values[2]}, Server: {values[3]}\n")
-                
-                elif scan_type == "ports":
-                    for item in self.ports_tree.get_children():
-                        port = self.ports_tree.item(item)["values"][0]
-                        f.write(f"Open Port: {port}\n")
-                    
-                elif scan_type == "asn":
-                    for item in self.asn_tree.get_children():
-                        values = self.asn_tree.item(item)["values"]
-                        f.write(f"{values[0]}: {values[1]}\n")
-                
-                elif scan_type == "headers":
-                    for item in self.headers_tree.get_children():
-                        values = self.headers_tree.item(item)["values"]
-                        f.write(f"{values[0]}: {values[1]}\n")
-                
-                elif scan_type == "javascript":
-                    for item in self.javascript_tree.get_children():
-                        values = self.javascript_tree.item(item)["values"]
-                        f.write(f"File: {values[0]}, Status: {values[1]}\n")
-                
-                elif scan_type == "links":
-                    for item in self.links_tree.get_children():
-                        link = self.links_tree.item(item)["values"][0]
-                        f.write(f"{link}\n")
-                
-                elif scan_type == "whois":
-                    for item in self.whois_tree.get_children():
-                        values = self.whois_tree.item(item)["values"]
-                        f.write(f"{values[0]}: {values[1]}\n")
-                        
-            print(f"Results saved to {filename}")
-            
-        except Exception as e:
-            print(f"Error saving results: {e}")
-
-    def check_tools(self):
-        for item in self.tools_tree.get_children():
-            self.tools_tree.delete(item)
-            
-        # Check and install tools
-        results = check_and_install_tools()
-        
-        # Update tree with results
-        for result in results:
-            self.tools_tree.insert(
-                "",
-                "end",
-                values=(
-                    result['tool'],
-                    result['status'],
-                    result['description']
-                )
+        # Reset after 3 seconds
+        self.window.after(3000, lambda: (
+            self.status_indicator.configure(text_color=self.colors["text"]),
+            self.status_bar.configure(
+                text="Ready for next scan",
+                text_color=self.colors["text"]
             )
+        ))
+        
+        if self.status_update_id:
+            self.window.after_cancel(self.status_update_id)
 
+    def start_status_monitoring(self):
+        """Enhanced status monitoring with visual feedback"""
+        if self.status_update_id:
+            self.window.after_cancel(self.status_update_id)
+        
+        # Start pulsing animation
+        self.pulse_animation()
+        
+        # Enable stop button, update scan button
+        self.stop_button.configure(state="normal")
+        self.scan_button.configure(state="disabled")
+        
+        # Start monitoring
+        self.status_update_id = self.window.after(100, self.update_status)
+
+    def pulse_animation(self):
+        """Create pulsing animation for status indicator"""
+        if not hasattr(self, 'pulse_colors'):
+            self.pulse_colors = [
+                self.colors["primary"],
+                self.colors["accent"],
+                "#2196F3",
+                "#64B5F6",
+                "#90CAF9"
+            ]
+            self.pulse_index = 0
+
+        if self.is_scanning:
+            self.status_indicator.configure(text_color=self.pulse_colors[self.pulse_index])
+            self.pulse_index = (self.pulse_index + 1) % len(self.pulse_colors)
+            self.window.after(500, self.pulse_animation)
+
+    def toggle_sidebar(self):
+        """Toggle sidebar visibility"""
+        current_width = self.nav_container.winfo_width()
+        
+        if current_width > 50:  # If sidebar is expanded
+            # Collapse
+            self.nav_container.configure(width=50)
+            self.nav_frame.pack_forget()  # Hide navigation buttons
+            self.sidebar_toggle_btn.configure(text="☰")
+        else:
+            # Expand
+            self.nav_container.configure(width=200)
+            self.nav_frame.pack(fill="both", expand=True)  # Show navigation buttons
+            self.sidebar_toggle_btn.configure(text="✕")
+
+    def show_dork_scan(self):
+        """Prepare UI for dorking"""
+        # Clear existing widgets
+        for widget in self.results_frame.winfo_children():
+            widget.destroy()
+
+        # Create dork type selection frame
+        dork_type_frame = ctk.CTkFrame(
+            self.results_frame,
+            fg_color=self.colors["secondary"]
+        )
+        dork_type_frame.pack(fill="x", padx=10, pady=5)
+
+        # Dork type selector
+        self.dork_type = ctk.CTkSegmentedButton(
+            dork_type_frame,
+            values=["Google Dork", "GitHub Dork"],
+            command=self.on_dork_type_change
+        )
+        self.dork_type.pack(padx=10, pady=5)
+        self.dork_type.set("Google Dork")
+
+        # GitHub API Key frame (initially hidden)
+        self.github_api_frame = ctk.CTkFrame(
+            self.results_frame,
+            fg_color=self.colors["secondary"]
+        )
+        
+        self.github_api_entry = ctk.CTkEntry(
+            self.github_api_frame,
+            placeholder_text="Enter GitHub API Key",
+            width=300
+        )
+        self.github_api_entry.pack(padx=10, pady=5)
+
+        # Create Treeview for results
+        self.create_results_treeview()
+        self.results_tree['columns'] = ("Title", "URL", "Description")
+        self.results_tree.heading("Title", text="Title")
+        self.results_tree.heading("URL", text="URL")
+        self.results_tree.heading("Description", text="Description")
+        
+        # Column widths
+        self.results_tree.column("Title", width=200)
+        self.results_tree.column("URL", width=300)
+        self.results_tree.column("Description", width=400)
+
+        # Update scan button
+        self.scan_button.configure(command=self.start_dork_scan)
+        self.current_scan_type = "dork"
+
+    def on_dork_type_change(self, value):
+        """Handle dork type change"""
+        if value == "GitHub Dork":
+            self.github_api_frame.pack(fill="x", padx=10, pady=5)
+        else:
+            self.github_api_frame.pack_forget()
+
+    def start_dork_scan(self):
+        """Start dorking scan"""
+        query = self.domain_entry.get()
+        if not query:
+            messagebox.showerror("Error", "Please enter a search query")
+            return
+
+        # Clear existing results
+        for item in self.results_tree.get_children():
+            self.results_tree.delete(item)
+
+        # Start status monitoring
+        self.start_status_monitoring()
+        
+        # Initialize scanner
+        scanner = DorkScanner(self.status_queue)
+        
+        # Start appropriate scan based on type
+        dork_type = self.dork_type.get()
+        
+        def run_scan():
+            try:
+                if dork_type == "GitHub Dork":
+                    api_key = self.github_api_entry.get()
+                    if not api_key:
+                        messagebox.showerror("Error", "GitHub API key is required")
+                        return
+                    results = scanner.github_dork(query, api_key)
+                else:
+                    results = scanner.google_dork(query)
+                
+                # Update results in UI
+                for result in results:
+                    self.window.after(0, self._update_dork_tree, result)
+                    
+            except Exception as e:
+                self.window.after(0, lambda: messagebox.showerror("Scan Error", str(e)))
+            
+            finally:
+                self.window.after(0, self.stop_scan)
+        
+        # Start scan in thread
+        threading.Thread(target=run_scan, daemon=True).start()
+
+    def _update_dork_tree(self, result):
+        """Update treeview with dork result"""
+        self.results_tree.insert("", "end", values=result)
+
+def main():
+    app = ReconX()
+    app.window.mainloop()
 
 if __name__ == "__main__":
-    reconx = ReconX()
-    reconx.window.mainloop()
+    main()
