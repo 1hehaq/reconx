@@ -20,6 +20,8 @@ import json
 from datetime import datetime
 import os
 import sys
+from modules.subdomain_enum import SubdomainEnumerator
+from modules.tools import check_and_install_tools
 
 requests.packages.urllib3.disable_warnings()
 
@@ -30,31 +32,65 @@ class ReconX:
         self.window.geometry("1025x575")
         self.window.configure(bg="#000000")
         self.window.configure(fg_color="#000000")
-        # Add window icon (add this after window creation)
-        icon_photo = tk.PhotoImage(file="icons/logo.png")
+        
+        # Some issues when it run on posix
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        icon_path = os.path.join(current_dir, "icons")
+        
+        icon_photo = tk.PhotoImage(file=os.path.join(icon_path, "logo.png"))
         self.window.iconphoto(False, icon_photo)
         self.window.resizable(False, False)
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
-        icon_path = os.path.join(os.path.dirname(__file__), "icons")
-
-        # Update other image loads
-        icon_photo = tk.PhotoImage(file=("icons/logo.png"))
-        self.window.iconphoto(False, icon_photo)
-        self.stop_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "stop.png")), size=(20, 20))
-        self.start_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "start.png")), size=(20, 20))
-        self.clear_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "clear.png")), size=(20, 20))
-        self.logo_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "logo.png")), size=(100, 100))
-        self.home_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "home.png")), size=(30, 30))
-        self.settings_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "settings.png")), size=(30, 30))
-        self.subdomains_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "domains.png")), size=(30, 30))
-        self.asn_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "asn.png")), size=(30, 30))
-        self.headers_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "headers.png")), size=(30, 30))
-        self.javascript_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "javascript.png")), size=(30, 30))
-        self.links_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "links.png")), size=(30, 30))
-        self.whois_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "whois.png")), size=(30, 30))
-
+        self.stop_image = ctk.CTkImage(
+            Image.open(os.path.join(icon_path, "stop.png")), 
+            size=(20, 20)
+        )
+        self.start_image = ctk.CTkImage(
+            Image.open(os.path.join(icon_path, "start.png")), 
+            size=(20, 20)
+        )
+        self.clear_image = ctk.CTkImage(
+            Image.open(os.path.join(icon_path, "clear.png")), 
+            size=(20, 20)
+        )
+        self.logo_image = ctk.CTkImage(
+            Image.open(os.path.join(icon_path, "logo.png")), 
+            size=(100, 100)
+        )
+        self.home_image = ctk.CTkImage(
+            Image.open(os.path.join(icon_path, "home.png")), 
+            size=(30, 30)
+        )
+        self.settings_image = ctk.CTkImage(
+            Image.open(os.path.join(icon_path, "settings.png")), 
+            size=(30, 30)
+        )
+        self.subdomains_image = ctk.CTkImage(
+            Image.open(os.path.join(icon_path, "domains.png")), 
+            size=(30, 30)
+        )
+        self.asn_image = ctk.CTkImage(
+            Image.open(os.path.join(icon_path, "asn.png")), 
+            size=(30, 30)
+        )
+        self.headers_image = ctk.CTkImage(
+            Image.open(os.path.join(icon_path, "headers.png")), 
+            size=(30, 30)
+        )
+        self.javascript_image = ctk.CTkImage(
+            Image.open(os.path.join(icon_path, "javascript.png")), 
+            size=(30, 30)
+        )
+        self.links_image = ctk.CTkImage(
+            Image.open(os.path.join(icon_path, "links.png")), 
+            size=(30, 30)
+        )
+        self.whois_image = ctk.CTkImage(
+            Image.open(os.path.join(icon_path, "whois.png")), 
+            size=(30, 30)
+        )
 
         def about():
             messagebox.showinfo("Author", "ReconX by c0d3ninja")
@@ -396,6 +432,23 @@ class ReconX:
         self.whois_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.whois_image, 
                                                corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Whois"))
         self.whois_button.pack(side=ctk.LEFT, padx=10, pady=10)
+
+        self.check_tools_button = ctk.CTkButton(
+            self.settings_frame,
+            text="Check/Install Tools",
+            command=self.check_tools
+        )
+        self.check_tools_button.pack(side=ctk.TOP, padx=10, pady=5)
+        
+        self.tools_tree = ttk.Treeview(
+            self.settings_frame,
+            columns=("Tool", "Status", "Description"),
+            show="headings"
+        )
+        self.tools_tree.heading("Tool", text="Tool")
+        self.tools_tree.heading("Status", text="Status")
+        self.tools_tree.heading("Description", text="Description")
+        self.tools_tree.pack(side=ctk.TOP, padx=10, pady=5)
 
     def stop_scan(self):
         """Stop any running scan"""
@@ -1092,108 +1145,77 @@ class ReconX:
             self.progress_bar.start()
             self.progress_label.configure(text="Getting subdomains...")
 
-            if "https://" in domain:
-                domain = domain.replace("https://", "")
-            if "https://www." in domain:
-                domain = domain.replace("https://www.", "")
-            if "http://" in domain:
-                domain = domain.replace("http://", "")
-            if "http://www." in domain:
-                domain = domain.replace("http://www.", "")
-            if domain == "":
+            if not domain:
                 messagebox.showerror("Error", "Please enter a domain")
-                self.progress_bar.stop()
-                self.progress_label.configure(text="Waiting for input...")
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
                 return
-            # Validate domain first
+            
+            domain = domain.replace("https://", "").replace("http://", "").replace("www.", "")
+            
+            # Validate domain
             if not self.is_valid_domain(domain):
                 messagebox.showerror("Error", "Please enter a valid domain name")
-                self.progress_bar.stop()
-                self.progress_label.configure(text="Waiting for input...")
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
                 return
 
-            # Get subdomains list first
-            current_script_dir = os.path.dirname(os.path.abspath(__file__))
-            spotter_path = os.path.join(current_script_dir, 'scripts', 'spotter.sh')
-            certsh_path = os.path.join(current_script_dir, 'scripts', 'certsh.sh')
-
-            cmd = f"{spotter_path} {domain} | uniq | sort"
-            p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            spotterout, err = p.communicate()
-            spotterout = spotterout.decode()
-
-            cmd = f"{certsh_path} {domain} | uniq | sort"
-            p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            certshout, err = p.communicate()
-            certshout = certshout.decode()
-
-            cmd = f"subfinder -d {domain} -silent"
-            p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            subdomains = [line.decode().strip() for line in p.stdout if line.decode().strip()]
-            subdomains = list(set(subdomains))
-            subdomains.extend(spotterout.split("\n"))
-            subdomains.extend(certshout.split("\n"))
-
-            # Update progress label with total count
-            total_subdomains = len(subdomains)
-            processed = 0
-            self.progress_label.configure(text=f"Processing 0/{total_subdomains} subdomains...")
-
-            # Process subdomains concurrently
             try:
                 self.start_scan()
-
+                
+                # Initialize enumerator
+                enumerator = SubdomainEnumerator(
+                    domain,
+                    proxy=self.proxy_entry.get(),
+                    user_agent=self.ua_entry.get()
+                )
+                
+                # Get max threads from settings
                 max_threads = int(self.thread_entry.get())
+                
+                # Run enumeration
+                subdomains = enumerator.enumerate(max_threads=max_threads)
+                
+                # Process results
+                total = len(subdomains)
+                processed = 0
+                
+                self.progress_label.configure(text=f"Processing {processed}/{total} subdomains...")
+                
+                # Process each subdomain
                 with ThreadPoolExecutor(max_workers=max_threads) as executor:
-                    # Submit all tasks
                     future_to_subdomain = {
                         executor.submit(self.process_subdomain, subdomain): subdomain 
                         for subdomain in subdomains
                     }
-
-                    # Process completed tasks as they finish
+                    
                     for future in as_completed(future_to_subdomain):
                         if not self.is_scanning:
                             executor.shutdown(wait=False)
                             break
-                        try:
-                            result = future.result()
-                            if "Error" not in result:
-                                self.subdomain_tree.insert("", "end", values=result)
-                                processed += 1
-                                # Update progress
-                                self.progress_label.configure(
-                                    text=f"Processing {processed}/{total_subdomains} subdomains..."
-                                )
-                            elif "Error" in result:
-                                pass
-                        except Exception as e:
-                            print(f"Task error: {e}")
-
-                self.progress_bar.stop()
+                            
+                        processed += 1
+                        self.progress_label.configure(
+                            text=f"Processing {processed}/{total} subdomains..."
+                        )
+                        
+                        result = future.result()
+                        if result:
+                            self.subdomain_tree.insert("", "end", values=result)
+                
+                if self.save_results_var.get():
+                    enumerator.save_results(domain, subdomains)
+                    
                 self.progress_label.configure(
                     text=f"Done! Found {len(self.subdomain_tree.get_children())} subdomains"
                 )
-                self.save_scan_results("subdomains", None)
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)
-    
-            finally:
-                self.is_scanning = False
-                self.stop_button.configure(state=ctk.DISABLED)
-                self.button.configure(state=ctk.NORMAL)
-                self.clear_button.configure(state=ctk.NORMAL)    
-
-        except Exception as e:
+                
+            except Exception as e:
+                self.progress_label.configure(text=f"Error: {str(e)}")
+                messagebox.showerror("Error", str(e))
+                
+        finally:
             self.progress_bar.stop()
-            self.progress_label.configure(text="Error")
+            self.is_scanning = False
+            self.stop_button.configure(state=ctk.DISABLED)
             self.button.configure(state=ctk.NORMAL)
             self.clear_button.configure(state=ctk.NORMAL)
-            print(f"Main error: {e}")
 
     def clear_textbox(self):
         if self.menu.get() == "Subdomain":
@@ -1288,6 +1310,25 @@ class ReconX:
             
         except Exception as e:
             print(f"Error saving results: {e}")
+
+    def check_tools(self):
+        for item in self.tools_tree.get_children():
+            self.tools_tree.delete(item)
+            
+        # Check and install tools
+        results = check_and_install_tools()
+        
+        # Update tree with results
+        for result in results:
+            self.tools_tree.insert(
+                "",
+                "end",
+                values=(
+                    result['tool'],
+                    result['status'],
+                    result['description']
+                )
+            )
 
 
 if __name__ == "__main__":
