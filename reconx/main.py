@@ -7,6 +7,8 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from ipwhois import IPWhois
 from CTkMenuBar import *
+from modules.tooltip import ToolTip
+from scripts.shodan_api import shodan_scan, host_info
 import customtkinter as ctk
 import requests
 import threading
@@ -54,8 +56,8 @@ class ReconX:
         self.javascript_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "javascript.png")), size=(30, 30))
         self.links_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "links.png")), size=(30, 30))
         self.whois_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "whois.png")), size=(30, 30))
-
-
+        self.shodan_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "shodan.png")), size=(30, 30))
+        
         def about():
             messagebox.showinfo("Author", "ReconX by c0d3ninja")
 
@@ -145,6 +147,18 @@ class ReconX:
         self.progress_label = ctk.CTkLabel(self.frame_top, text="Waiting for input...", font=("Arial", 14), text_color="white")
         self.progress_label.pack(side=ctk.BOTTOM, padx=10, pady=10)
 
+        self.status_frame = ctk.CTkFrame(self.frame_top, width=700, fg_color="#000000")
+        self.status_frame.pack(side=ctk.BOTTOM, padx=10, pady=0)
+
+        self.threads_label = ctk.CTkLabel(self.status_frame, text="Threads: 0", font=("Arial", 14), text_color="white")
+        self.threads_label.pack(side=ctk.LEFT, padx=10, pady=10)
+
+        self.proxy_label = ctk.CTkLabel(self.status_frame, text="Proxy: None", font=("Arial", 14), text_color="white")
+        self.proxy_label.pack(side=ctk.LEFT, padx=10, pady=10)
+
+        self.user_agent_label = ctk.CTkLabel(self.status_frame, text="User-Agent: None", font=("Arial", 14), text_color="white")
+        self.user_agent_label.pack(side=ctk.LEFT, padx=10, pady=10)
+
         self.entry = ctk.CTkEntry(self.frame, width=580, height=40, placeholder_text="Enter a domain", font=("Arial", 14), text_color="white", bg_color="#000000", fg_color="#000000")
         self.entry.pack(side=ctk.LEFT, padx=10, pady=10)
 
@@ -181,7 +195,7 @@ class ReconX:
         #self.textbox = ctk.CTkTextbox(self.frame_top, width=760, height=360, font=("Arial", 14), text_color="white", bg_color="#000000", fg_color="#000000")
         #self.textbox.pack(side=ctk.LEFT, padx=10, pady=10)
 
-        self.menu = ctk.CTkOptionMenu(self.frame, width=100, height=25, values=["Headers", "Port Scan", "ASN", "Subdomains", "Links", "JavaScript", "Whois"], font=("Arial", 14), text_color="white", 
+        self.menu = ctk.CTkOptionMenu(self.frame, width=100, height=25, values=["Headers", "Port Scan", "ASN", "Subdomains", "Links", "JavaScript", "Whois", "Shodan"], font=("Arial", 14), text_color="white", 
                                       bg_color="#000000", fg_color="#000000")
         self.menu.pack(side=ctk.RIGHT, padx=10, pady=10)
 
@@ -197,6 +211,7 @@ class ReconX:
         self.tabview.add("Links")
         self.tabview.add("JavaScript")
         self.tabview.add("Whois")
+        self.tabview.add("Shodan")
         self.tabview._segmented_button.configure(border_width=0, fg_color="#000000", text_color="#000000")
 
         self.port_services_tabview = ctk.CTkTabview(self.settings_frame, width=200, height=500, text_color="white", fg_color="#000000")
@@ -213,8 +228,8 @@ class ReconX:
         self.home_label = ctk.CTkLabel(self.tabview.tab("Home"), text="", font=("Arial", 25), text_color="white", image=self.logo_image, compound="top")
         self.home_label.pack(side=ctk.TOP, padx=10, pady=10)
 
-        self.home_label = ctk.CTkLabel(self.tabview.tab("Home"), text="WELCOME TO RECONX", font=("Arial", 25), text_color="white")
-        self.home_label.pack(side=ctk.TOP, padx=10, pady=10)
+        #self.home_label = ctk.CTkLabel(self.tabview.tab("Home"), text="WELCOME TO RECONX", font=("Arial", 25), text_color="white")
+        #self.home_label.pack(side=ctk.TOP, padx=10, pady=10)
 
         # Thread Settings
         self.thread_settings_frame = ctk.CTkFrame(self.tabview.tab("Settings"), fg_color="#000000")
@@ -357,6 +372,21 @@ class ReconX:
         self.whois_tree.configure(yscrollcommand=self.whois_scrollbar.set)
         self.whois_scrollbar.pack(side="right", fill="y")
 
+        # Shodan Tree
+        self.shodan_tree = ttk.Treeview(self.tabview.tab("Shodan"), 
+                                   columns=("IP", "ORG", "PORTS"), 
+                                   show="headings", 
+                                   style="Treeview")
+        self.shodan_tree.heading("IP", text="IP")
+        self.shodan_tree.heading("ORG", text="ORG")
+        self.shodan_tree.heading("PORTS", text="PORTS")
+        self.shodan_tree.pack(side="left", fill="both", expand=True)
+        self.shodan_tree.column("IP", width=150)
+        self.shodan_tree.column("ORG", width=150)
+        self.shodan_tree.column("PORTS", width=150)
+        self.shodan_scrollbar = ttk.Scrollbar(self.tabview.tab("Shodan"), orient="vertical", command=self.shodan_tree.yview)
+        self.shodan_tree.configure(yscrollcommand=self.shodan_scrollbar.set)
+        self.shodan_scrollbar.pack(side="right", fill="y")
 
 
         self.home_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.home_image, 
@@ -397,6 +427,16 @@ class ReconX:
                                                corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Whois"))
         self.whois_button.pack(side=ctk.LEFT, padx=10, pady=10)
 
+        self.shodan_button = ctk.CTkButton(self.menu_frame, width=20, height=20, text="", font=("Arial", 14), image=self.shodan_image, 
+                                               corner_radius=100, fg_color="transparent", text_color="white", command=lambda: self.switch_tab("Shodan"))
+        self.shodan_button.pack(side=ctk.LEFT, padx=10, pady=10)
+
+        self.thread_tooltip = ToolTip(self.thread_entry, "Max Threads")
+        self.proxy_tooltip = ToolTip(self.proxy_entry, "Proxy")
+        self.ua_tooltip = ToolTip(self.ua_entry, "User-Agent")
+
+        self.update_status()
+
     def stop_scan(self):
         """Stop any running scan"""
         self.is_scanning = False
@@ -411,6 +451,34 @@ class ReconX:
         self.button.configure(state=ctk.DISABLED)
         self.clear_button.configure(state=ctk.DISABLED)
         self.stop_button.configure(state=ctk.NORMAL)
+
+    def update_status(self):
+        """Update the status labels"""
+        if self.thread_entry.get():
+            self.thread_tooltip.update_text(self.thread_entry.get())
+            self.threads_label.configure(text=f"Threads: {self.thread_entry.get()}")
+        else:
+            self.thread_tooltip.update_text("Max Threads")
+            self.threads_label.configure(text=f"Threads: {self.thread_entry.get()}")
+
+        if self.proxy_entry.get():
+            self.proxy_tooltip.update_text(self.proxy_entry.get())
+            self.proxy_label.configure(text=f"Proxy: {self.proxy_entry.get()}")
+        else:
+            self.proxy_tooltip.update_text("Proxy")
+            self.proxy_label.configure(text=f"Proxy: {self.proxy_entry.get()}")
+
+        if self.ua_entry.get():
+            user_agent = self.ua_entry.get() 
+            user_agent_display = user_agent.split(" ")[0]
+            self.ua_tooltip.update_text(user_agent)
+            self.user_agent_label.configure(text=f"User-Agent: {user_agent_display}")
+        else:
+            self.ua_tooltip.update_text("User-Agent")
+            self.user_agent_label.configure(text=f"User-Agent: {self.ua_entry.get()}")
+
+        self.window.after(500, self.update_status)
+
 
     def animate_waiting(self):
         """Animate the waiting text"""
@@ -432,7 +500,8 @@ class ReconX:
                 "Headers": self.headers_button,
                 "Links": self.links_button,
                 "JS Files": self.javascript_button,
-                "Whois": self.whois_button
+                "Whois": self.whois_button,
+                "Shodan": self.shodan_button
             }
             
             # Reset all buttons to default state
@@ -463,6 +532,8 @@ class ReconX:
             self.links_thread()
         elif self.menu.get() == "Whois":
             self.whois_thread()
+        elif self.menu.get() == "Shodan":
+            self.shodan_thread()
 
     def is_valid_domain(self, domain):
         """
@@ -486,6 +557,48 @@ class ReconX:
             return True
         except socket.gaierror:
             return False
+        
+    def shodan(self):
+        try:   
+            domain = self.entry.get()
+            if not domain:
+                self.progress_label.configure(text="Please enter a domain or IP")
+                return
+
+            # Validate domain first
+            #if not self.is_valid_domain(domain):
+            #    messagebox.showerror("Error", "Please enter a valid domain name")
+            #    self.progress_bar.stop()
+            #    self.progress_label.configure(text="Waiting for input...")
+            #    self.button.configure(state=ctk.NORMAL)
+            #    self.clear_button.configure(state=ctk.NORMAL)
+            #    return
+                
+            # Clear existing entries
+            for item in self.shodan_tree.get_children():
+                self.shodan_tree.delete(item)
+                
+            self.progress_label.configure(text="Querying Shodan...")
+            self.progress_bar.start()
+            
+            # Get host information
+            info = host_info(domain)
+            
+            # Insert the information into the tree
+            self.shodan_tree.insert("", "end", values=(
+                info.get('ip', 'N/A'),
+                info.get('org', 'N/A'),
+                info.get('ports', 'N/A')
+            ))
+            
+            self.progress_bar.stop()
+            self.progress_label.configure(text="Shodan query completed")
+            
+        except Exception as e:
+            self.progress_bar.stop()
+            self.progress_label.configure(text=f"Error: {str(e)}")
+            print(f"Error in Shodan scan: {e}")
+
 
     def process_link(self, link):
         """Process individual link and return formatted result"""
@@ -1213,6 +1326,9 @@ class ReconX:
         if self.menu.get() == "Links":
             self.links_tree.delete(*self.links_tree.get_children())
             self.progress_label.configure(text="Waiting for input...")
+        if self.menu.get() == "Shodan":
+            self.shodan_tree.delete(*self.shodan_tree.get_children())
+            self.progress_label.configure(text="Waiting for input...")
 
     def subdomain_thread(self):
         threading.Thread(target=self.get_subdomains).start()
@@ -1234,6 +1350,9 @@ class ReconX:
 
     def whois_thread(self):
         threading.Thread(target=self.whois).start()
+
+    def shodan_thread(self):
+        threading.Thread(target=self.shodan).start()
 
     def save_scan_results(self, scan_type, results):
         """Save scan results to a file if checkbox is checked"""
