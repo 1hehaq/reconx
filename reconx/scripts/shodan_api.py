@@ -4,7 +4,7 @@ import json
 import socket
 from typing import Union, Dict, List
 
-SHODAN_API_KEY = "iWflkVlY3yo2zM67d0ILuU7qEncsGz4A"
+SHODAN_API_KEY = ""
 api = shodan.Shodan(SHODAN_API_KEY)
 
 def get_ip_from_domain(domain: str) -> str:
