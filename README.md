@@ -1,144 +1,150 @@
-# ReconX
+<div align="center">
+   <a href="https://github.com/c0d3ninja/reconx"><img src="https://github.com/1hehaq/reconx/blob/main/reconx/icons/logo.png" width="200" height="200" align="center"/></a>
+</div>
 
-<p align="center">
-  <img src="icons/logo.png" alt="ReconX Logo" width="200"/>
-</p>
+<br>
+<br>
+<br>
 
-ReconX is a powerful reconnaissance tool with a graphical user interface built using Python and CustomTkinter. It provides various features for gathering information about domains, including subdomain enumeration, port scanning, ASN lookup, and more.
+<div align="center">
+   
+|ReconX|Multi Reconnaissance Tool|for Information Gathering|
+|----------------|--------------|-------------|
+| `R`| `=`| `Reconnaissance & Research`|
+| `E`| `=`| `Enumeration of Subdomains`|
+| `C`| `=`| `Comprehensive Port Scanning`|
+| `O`| `=`| `Open Source Intelligence`|
+| `N`| `=`| `Network Information Gathering`|
+| `X`| `=`| `eXtensive Analysis Tools`|
 
-## Features
+> **ReconX**! a comprehensive GUI based tool that do: <br><br> **`Subdomain Enumeration` - `Port Scanning` - `ASN Lookup` - `Header Analysis` - `Link Discovery` - `JavaScript Analysis` - `WHOIS Lookup`**. <br><br> *`Made by`* - [`c0d3ninja`](https://github.com/c0d3ninja) x [`1hehaq`](https://github.com/1hehaq)!
 
-- 🔍 **Subdomain Enumeration**: Discover subdomains associated with the target domain
-- 🚪 **Port Scanning**: Scan for open ports and identify running services
-- 🌐 **ASN Information**: Retrieve Autonomous System Number details
-- 📋 **Header Analysis**: Examine HTTP headers of the target
-- 🔗 **Link Discovery**: Extract all links from the target website
-- 📜 **JavaScript Files**: Identify and analyze JavaScript files
-- ℹ️ **WHOIS Lookup**: Get domain registration information
-- 💾 **Save Results**: Option to save scan results to files
-- 🔄 **Auto Updates**: Built-in update mechanism
-- 🌐 **Proxy Support**: Configure custom proxy settings
-- 🎯 **Custom User-Agent**: Set custom User-Agent strings
+</div>
 
-## Installation
+<hr>
 
-### Prerequisites
+<br>
+<br>
+<br>
 
-- Python 3.x
-- Git
-- Subfinder (for subdomain enumeration)
+<div align="center">
+  
+| Features                          | About                                                                       |
+|-----------------------------------|-----------------------------------------------------------------------------|
+| `Subdomain Enumeration`           | Discover and validate subdomains associated with target domain.             |
+| `Port Scanning`                   | Identify open ports and running services with concurrent scanning.          |
+| `ASN Information`                 | Retrieve detailed Autonomous System Number information.                      |
+| `Header Analysis`                 | Examine and analyze HTTP headers of target websites.                        |
+| `Link Discovery`                  | Extract and validate all links from target websites.                        |
+| `JavaScript Analysis`             | Identify and analyze JavaScript files on target domains.                    |
+| `WHOIS Lookup`                    | Retrieve comprehensive domain registration information.                      |
+| `Multi-threaded Scanning`         | Improved performance through concurrent operations.                         |
+| `Proxy Support`                   | Configure custom proxy settings for scans.                                  |
+| `Custom User-Agent`               | Set custom User-Agent strings for requests.                                 |
+| `Save Results`                    | Automatically save scan results to organized files.                         |
+| `Auto Updates`                    | Built-in mechanism to keep tool updated.                                    |
 
-### Setup
+</div>
 
-1. Clone the repository:
+<br>
+<hr>
+<br>
+<br>
 
-git clone https://github.com/c0d3ninja/reconx.git
+| Language                          | Packages                                                                    |
+|-----------------------------------|-----------------------------------------------------------------------------|
+| ***Python***| `Python 3.x` `customtkinter` `requests` `python-whois` `socket` `subprocess` `threading` `datetime` `json` `os` `sys`|
 
-2. Install required Python packages:
+<br>
+<hr>
+<br>
 
-pip install -r requirements.txt
+## `Installation`
 
-3. Install Subfinder:
+#### Prerequisites
+<pre>
+# Install Python 3.x
+# Install Git
+# Install Subfinder (for subdomain enumeration)
+</pre>
 
-go install -v github.com/projectdiscovery/subfinder/v2@latest
-
-4. Cd into reconx directory:
-
+#### Clone the repository
+```bash
+git clone https://github.com/c0d3ninja/Reconnaissance.git
+```
+```bash
 cd reconx
+```
 
-5. Run ReconX:
+#### Install the requirements
+```bash
+pip3 install -r requirements.txt
+```
 
+#### Run the Application
+```bash
 python3 main.py
+```
 
-## Usage
+----
 
-2. Enter a domain name in the input field
+| Scan Configuration        |                                                                                         |
+|---------------------------|-----------------------------------------------------------------------------------------|
+| Target Domain             | Enter the domain name to scan in the input field.                                       |
+| Scan Type                 | Select from available scan types in the dropdown menu.                                  |
+| Thread Settings           | Configure the number of concurrent threads for scanning.                                |
+| Proxy Configuration       | Set up custom proxy settings for anonymous scanning.                                    |
+| User-Agent Configuration  | Customize User-Agent strings for requests.                                             |
 
-3. Select the desired scan type from the dropdown menu:
-   - Headers
-   - Port Scan
-   - ASN
-   - Subdomains
-   - Links
-   - JavaScript
-   - Whois
+----
 
-4. Click the start button to begin scanning
+| Result Management          |                                                                                         |
+|---------------------------|-----------------------------------------------------------------------------------------|
+| Save Location             | Results automatically saved in `results` directory.                                      |
+| File Format               | Files saved as `domain_scantype_timestamp.txt`                                          |
+| Result Display            | Real-time display of scan results in the GUI.                                           |
+| Export Options            | Save results in various formats for further analysis.                                   |
 
-### Configuration
+----
 
-#### Scan Settings
-- **Max Threads**: Configure the number of concurrent threads
-- **Port Range**: Set custom port ranges for scanning
-- **Proxy**: Add custom proxy settings
-- **User-Agent**: Set custom User-Agent string
-- **Save Results**: Toggle automatic saving of scan results
+### Scanning Modules
 
-## Screenshots
+1. **Subdomain Scanner**
+   - Utilizes Subfinder for comprehensive enumeration
+   - Validates discovered subdomains
+   - Maps subdomains to IP addresses
 
-[Add screenshots of your application here]
+2. **Port Scanner**
+   - Multi-threaded port scanning
+   - Service identification
+   - Customizable port ranges
 
-## Features in Detail
+3. **ASN Lookup**
+   - Organization details
+   - Network ranges
+   - Registration information
 
-### Subdomain Enumeration
-- Uses Subfinder for efficient subdomain discovery
-- Validates subdomains and checks their status
-- Displays IP addresses and server information
+4. **Header Analyzer**
+   - Security header checking
+   - Server information
+   - Response header analysis
 
-### Port Scanning
-- Concurrent port scanning for faster results
-- Service identification for open ports
-- Customizable port ranges
+5. **Link Discovery**
+   - Extracts all website links
+   - Validates link accessibility
+   - Path analysis
 
-### ASN Information
-- Retrieves detailed ASN information
-- Shows organization details
-- Displays network ranges
+6. **JavaScript Analyzer**
+   - Discovers JS files
+   - Checks file status
+   - Basic content analysis
 
-### Header Analysis
-- Examines HTTP response headers
-- Security header checking
-- Server information discovery
+7. **WHOIS Lookup**
+   - Registration details
+   - Expiration information
+   - Registrar data
 
-### JavaScript Analysis
-- Discovers JavaScript files
-- Checks file accessibility
-- Shows response status codes
+<hr>
 
-### Link Discovery
-- Extracts all links from the target website
-- Validates link accessibility
-- Shows relative and absolute paths
-
-### WHOIS Information
-- Detailed domain registration info
-- Expiration dates
-- Registrar information
-
-## Saving Results
-
-Results can be automatically saved in the `results` directory with the following format:
-
-results/domain_scantype_timestamp.txt
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-[Add your license information here]
-
-## Acknowledgments
-
-- CustomTkinter for the modern UI components
-- Subfinder for subdomain enumeration capabilities
-- All other open-source tools and libraries used in this project
-
-## Author
-
-ReconX by c0d3ninja
-
-## Disclaimer
-
-This tool is for educational purposes only. Ensure you have permission to scan any target domains.
+> [!WARNING]  
+> ReconX is intended for educational and legitimate security testing purposes only. Users must ensure they have proper authorization before scanning any domains or systems. Unauthorized scanning may be illegal in your jurisdiction.
