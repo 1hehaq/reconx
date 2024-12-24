@@ -29,7 +29,7 @@ requests.packages.urllib3.disable_warnings()
 class ReconX:
     def __init__(self):
         self.window = ctk.CTk()
-        self.window.title("ReconX v1.1")
+        self.window.title("ReconX v1.2")
         self.window.geometry("1025x575")
         self.window.configure(bg="#000000")
         self.window.configure(fg_color="#000000")
