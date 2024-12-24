@@ -4,8 +4,13 @@ import json
 import socket
 from typing import Union, Dict, List
 
-SHODAN_API_KEY = ""
-api = shodan.Shodan(SHODAN_API_KEY)
+
+def get_api_key(api_key: str) -> shodan.Shodan:
+    """Initialize and return Shodan API client"""
+    if not api_key:
+        raise ValueError("Shodan API key is required")
+    return shodan.Shodan(api_key)
+
 
 def get_ip_from_domain(domain: str) -> str:
     """Convert domain to IP address"""
@@ -16,54 +21,116 @@ def get_ip_from_domain(domain: str) -> str:
     except socket.gaierror as e:
         raise ValueError(f"Could not resolve domain {domain}: {e}")
 
-def shodan_scan(domain: str, page=None, max_retries=3) -> List[str]:
-    ips = []
-    retry_count = 0
-    delay = 1  # Initial delay in seconds
-
-    while retry_count < max_retries:
+def shodan_scan(domain: str, api_key: str) -> List[Dict[str, str]]:
+    """Perform a Shodan search for all hosts related to a domain"""
+    try:
+        # Initialize API
+        if not api_key:
+            return [{'ip': domain, 'org': 'Error', 'ports': 'Shodan API key is required'}]
+        
+        api = shodan.Shodan(api_key)
+        
         try:
-            results = api.search(str(domain), page=page)
-            for result in results['matches']:
-                ips.append(result['ip_str'])
-            return ips  # Return the list of IPs
-        except shodan.exception.APIError as e:
-            if "Search cursor timed out" in str(e) and retry_count < max_retries - 1:
-                print(f"Search timed out. Retrying in {delay} seconds...")
-                time.sleep(delay)
-                retry_count += 1
-                delay *= 2  # Exponential backoff
-                page = None  # Reset page to start from the beginning
-            else:
-                raise  # Re-raise the exception if max retries reached or different error
+            # Try direct host lookup first if domain is an IP
+            if domain.replace('.', '').isdigit():
+                host = api.host(domain)
+                ports = []
+                for item in host.get('data', []):
+                    if 'port' in item:
+                        port_info = f"{item['port']}"
+                        if 'product' in item:
+                            port_info += f" ({item['product']})"
+                        ports.append(port_info)
+                
+                return [{
+                    'hostnames': host.get('hostnames', ['n/a'])[0] if host.get('hostnames') else 'n/a',
+                    'ip': host.get('ip_str', domain),
+                    'org': host.get('org', 'n/a'),
+                    'vulns': next(iter(host.get('vulns', [])), 'No known vulnerabilities')
+                }]
+        except:
+            pass  # If direct lookup fails, fall back to search
+            
+        # Search for the domain
+        results = api.search(f'hostname:"{domain}"')
+        results_list = []
 
-def host_info(domain: str) -> Dict[str, str]:
+        for result in results['matches']:
+            ports = []
+            for item in result.get('data', []):
+                if 'port' in item:
+                    port_info = f"{item['port']}"
+                    if 'product' in item:
+                        port_info += f" ({item['product']})"
+                    ports.append(port_info)
+            
+            host_data = {
+                'hostnames': result.get('hostnames', ['n/a'])[0] if result.get('hostnames') else 'n/a',
+                'ip': result.get('ip_str', 'n/a'),
+                'org': result.get('org', 'n/a'),
+                # 'ports': ', '.join(ports),
+                # 'os': result.get('os', 'n/a'),
+                'vulns': next(iter(result.get('vulns', [])), 'No known vulnerabilities')
+            }
+            results_list.append(host_data)
+        
+        return results_list if results_list else [{
+            'hostnames': domain,
+            'ip': 'No Results',
+            'org': 'No Shodan data found',
+            'vulns': 'n/a'
+        }]
+
+    except shodan.APIError as e:
+        return [{
+            'ip': domain,
+            'org': 'Error',
+            'ports': f"Shodan API Error: {str(e)}",
+            'hostnames': 'n/a',
+            'os': 'n/a',
+            'vulns': 'n/a'
+        }]
+    except Exception as e:
+        return [{
+            'ip': domain,
+            'org': 'Error',
+            'ports': f"Unexpected Error: {str(e)}",
+            'hostnames': 'n/a',
+            'os': 'n/a',
+            'vulns': 'n/a'
+        }]
+
+def host_info(domain: str, api_key: str) -> Dict[str, str]:
     """Get host information from Shodan"""
     try:
-        # First convert domain to IP if necessary
+        # Initialize API
+        api = get_api_key(api_key)
+        
+        # Convert domain to IP if necessary
         ip = get_ip_from_domain(domain) if not domain.replace('.', '').isdigit() else domain
         
+        # Get host information
         host = api.host(ip)
-        ports = []
-        org = host.get('org', 'n/a')
         
-        for item in host['data']:
-            ports.append(item['port'])
+        # Extract information
+        ports = [str(item['port']) for item in host.get('data', [])]
+        org = host.get('org', 'n/a')
         
         return {
             'ip': ip,
             'org': org,
-            'ports': ','.join(map(str, ports))
+            'ports': ','.join(ports) if ports else 'No open ports found'
         }
-    except shodan.exception.APIError as e:
-        print(f"Shodan API Error: {e}")
+    except shodan.APIError as e:
+        raise ValueError(f"Shodan API Error: {str(e)}")
     except ValueError as e:
-        print(f"Domain Resolution Error: {e}")
+        raise ValueError(f"Domain Resolution Error: {str(e)}")
     except Exception as e:
-        print(f"Unexpected Error: {e}")
+        raise ValueError(f"Unexpected Error: {str(e)}")
 
-def scan_single_ip(ip: str) -> Dict[str, str]:
+def scan_single_ip(ip: str, api_key: str) -> Dict[str, str]:
     """Scan a single IP address with Shodan and return detailed information"""
+    api = get_api_key(api_key)
     try:
         host = api.host(ip)
         if host:  # If we got data back
@@ -88,7 +155,7 @@ def scan_single_ip(ip: str) -> Dict[str, str]:
                 'ports': ', '.join(ports) if ports else 'No open ports found',
                 'hostnames': ', '.join(hostnames) if hostnames else 'n/a',
                 'os': os,
-                'vulns': ', '.join(vulns) if vulns else 'No known vulnerabilities'
+                'vulns': vulns[0] if vulns else 'No known vulnerabilities'
             }
         else:  # If no data was returned
             return {

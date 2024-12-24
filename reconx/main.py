@@ -9,6 +9,7 @@ from ipwhois import IPWhois
 from CTkMenuBar import *
 from modules.tooltip import ToolTip
 from scripts.shodan_api import shodan_scan, host_info
+from modules.save_results import SaveResults
 import customtkinter as ctk
 import requests
 import threading
@@ -57,7 +58,7 @@ class ReconX:
         self.links_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "links.png")), size=(30, 30))
         self.whois_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "whois.png")), size=(30, 30))
         self.shodan_image = ctk.CTkImage(Image.open(os.path.join(icon_path, "shodan.png")), size=(30, 30))
-        
+
         def about():
             messagebox.showinfo("Author", "ReconX by c0d3ninja")
 
@@ -121,9 +122,10 @@ class ReconX:
         file_button = file_menu.add_cascade("File")
         file_button_help =  file_menu.add_cascade("Help")
 
-        submenu = CustomDropdownMenu(widget=file_button, bg_color="#000000")
-        submenu.add_option("Update", command=update)
-        submenu.add_option("Exit", command=exit)
+        file_menu = CustomDropdownMenu(widget=file_button, bg_color="#000000")
+        file_menu.add_option("Update", command=update)
+        file_menu.add_option("Save Results", command=lambda: self.save_current_results())
+        file_menu.add_option("Exit", command=exit)
 
         helpmenu = CustomDropdownMenu(widget=file_button_help, bg_color="#000000")
         helpmenu.add_option("About", command=about)
@@ -233,7 +235,7 @@ class ReconX:
 
         # Thread Settings
         self.thread_settings_frame = ctk.CTkFrame(self.tabview.tab("Settings"), fg_color="#000000")
-        self.thread_settings_frame.pack(side=ctk.TOP, fill="x", padx=10, pady=5)
+        self.thread_settings_frame.pack(side=ctk.TOP, fill="x", padx=10, pady=7)
 
         self.thread_controls_frame = ctk.CTkFrame(self.thread_settings_frame, fg_color="#000000")
         self.thread_controls_frame.pack(side=ctk.TOP, padx=5, pady=5)
@@ -244,30 +246,28 @@ class ReconX:
         self.ua_controls_frame = ctk.CTkFrame(self.thread_settings_frame, fg_color="#000000")
         self.ua_controls_frame.pack(side=ctk.TOP, padx=5, pady=5)
 
+        self.shodan_controls_frame = ctk.CTkFrame(self.thread_settings_frame, fg_color="#000000")
+        self.shodan_controls_frame.pack(side=ctk.TOP, padx=5, pady=5)
+
+        # User-Agent
         ua_label = ctk.CTkLabel(self.ua_controls_frame, text="User-Agent:", text_color="white")
         ua_label.pack(side=ctk.LEFT, padx=10)
         self.ua_entry = ctk.CTkEntry(self.ua_controls_frame, width=125, height=25, fg_color="#000000")
         self.ua_entry.pack(side=ctk.LEFT, padx=10)
 
-
+        # Proxy
         proxy_label = ctk.CTkLabel(self.proxy_controls_frame, text="Proxy:", text_color="white")
         proxy_label.pack(side=ctk.LEFT, padx=27)
         self.proxy_entry = ctk.CTkEntry(self.proxy_controls_frame, width=125, height=25, fg_color="#000000")
         self.proxy_entry.pack(side=ctk.LEFT, padx=27)
 
+        # Shodan Key
+        shodan_label = ctk.CTkLabel(self.shodan_controls_frame, text="Shodan Key:", text_color="white")
+        shodan_label.pack(side=ctk.LEFT, padx=10)
+        self.shodan_entry = ctk.CTkEntry(self.shodan_controls_frame, width=125, height=25, fg_color="#000000")
+        self.shodan_entry.pack(side=ctk.LEFT, padx=10)
 
-        # Add save results checkbox
-        self.save_results_var = ctk.BooleanVar(value=False)
-        self.save_results_checkbox = ctk.CTkCheckBox(
-            self.thread_settings_frame,
-            text="Save Results",
-            variable=self.save_results_var,
-            text_color="white",
-            fg_color="#14375e",
-            hover_color="#1c4b7e"
-        )
-        self.save_results_checkbox.pack(side=ctk.TOP, padx=10, pady=5)
-
+        # Threads
         self.thread_label = ctk.CTkLabel(self.thread_controls_frame, text="Max Threads:", text_color="white")
         self.thread_label.pack(side=ctk.LEFT, padx=5)
         self.thread_entry = ctk.CTkEntry(self.thread_controls_frame, width=125, height=25, fg_color="#000000")
@@ -374,16 +374,19 @@ class ReconX:
 
         # Shodan Tree
         self.shodan_tree = ttk.Treeview(self.tabview.tab("Shodan"), 
-                                   columns=("IP", "ORG", "PORTS"), 
+                                   columns=("IP", "ORG", "HOSTNAMES", "VULNS"), 
                                    show="headings", 
                                    style="Treeview")
+        self.shodan_tree.heading("HOSTNAMES", text="HOSTNAMES")
         self.shodan_tree.heading("IP", text="IP")
         self.shodan_tree.heading("ORG", text="ORG")
-        self.shodan_tree.heading("PORTS", text="PORTS")
+        self.shodan_tree.heading("VULNS", text="VULNS")
+
         self.shodan_tree.pack(side="left", fill="both", expand=True)
         self.shodan_tree.column("IP", width=150)
-        self.shodan_tree.column("ORG", width=150)
-        self.shodan_tree.column("PORTS", width=150)
+        self.shodan_tree.column("ORG", width=225)
+        self.shodan_tree.column("HOSTNAMES", width=200)
+        self.shodan_tree.column("VULNS", width=200)
         self.shodan_scrollbar = ttk.Scrollbar(self.tabview.tab("Shodan"), orient="vertical", command=self.shodan_tree.yview)
         self.shodan_tree.configure(yscrollcommand=self.shodan_scrollbar.set)
         self.shodan_scrollbar.pack(side="right", fill="y")
@@ -436,7 +439,7 @@ class ReconX:
         self.ua_tooltip = ToolTip(self.ua_entry, "User-Agent")
 
         self.update_status()
-
+        
     def stop_scan(self):
         """Stop any running scan"""
         self.is_scanning = False
@@ -561,19 +564,16 @@ class ReconX:
     def shodan(self):
         try:   
             domain = self.entry.get()
+            api_key = self.shodan_entry.get()
+            
             if not domain:
                 self.progress_label.configure(text="Please enter a domain or IP")
                 return
+            
+            if not api_key:
+                self.progress_label.configure(text="Please enter a Shodan API key in settings")
+                return
 
-            # Validate domain first
-            #if not self.is_valid_domain(domain):
-            #    messagebox.showerror("Error", "Please enter a valid domain name")
-            #    self.progress_bar.stop()
-            #    self.progress_label.configure(text="Waiting for input...")
-            #    self.button.configure(state=ctk.NORMAL)
-            #    self.clear_button.configure(state=ctk.NORMAL)
-            #    return
-                
             # Clear existing entries
             for item in self.shodan_tree.get_children():
                 self.shodan_tree.delete(item)
@@ -581,18 +581,22 @@ class ReconX:
             self.progress_label.configure(text="Querying Shodan...")
             self.progress_bar.start()
             
-            # Get host information
-            info = host_info(domain)
+            # Get search results
+            results = shodan_scan(domain, api_key)
             
             # Insert the information into the tree
-            self.shodan_tree.insert("", "end", values=(
-                info.get('ip', 'N/A'),
-                info.get('org', 'N/A'),
-                info.get('ports', 'N/A')
-            ))
+            for result in results:
+                self.shodan_tree.insert("", "end", values=(
+                    result.get('ip', 'N/A'),
+                    result.get('org', 'N/A'),
+                    # result.get('ports', 'N/A'),
+                    result.get('hostnames', 'N/A'),
+                    # result.get('os', 'N/A'),
+                    result.get('vulns', 'N/A')
+                ))
             
             self.progress_bar.stop()
-            self.progress_label.configure(text="Shodan query completed")
+            self.progress_label.configure(text=f"Found {len(results)} results from Shodan")
             
         except Exception as e:
             self.progress_bar.stop()
@@ -741,7 +745,6 @@ class ReconX:
                         except Exception as e:
                             print(f"Error processing future: {e}")
 
-                self.save_scan_results("whois", None)
                 self.progress_bar.stop()
                 self.progress_label.configure(text=f"Done! Found {len(self.whois_tree.get_children())} WHOIS entries")
 
@@ -831,7 +834,6 @@ class ReconX:
                         if result:
                             self.links_tree.insert("", "end", values=(result,))
 
-                self.save_scan_results("links", None)
                 self.progress_bar.stop()
                 self.progress_label.configure(text=f"Done! Found {len(self.links_tree.get_children())} links")
 
@@ -934,7 +936,6 @@ class ReconX:
                         except Exception as e:
                             print(f"Error downloading {script}: {e}")
                 
-                self.save_scan_results("javascript", None)
                 self.progress_bar.stop()
                 self.progress_label.configure(
                     text=f"Done! Processed {processed} JavaScript files"
@@ -1024,7 +1025,6 @@ class ReconX:
             for prop, value in asn_info.items():
                 self.asn_tree.insert("", "end", values=(prop, value))
             
-            self.save_scan_results("asn", None)
             self.progress_bar.stop()
             self.progress_label.configure(text="ASN info retrieved successfully!")
             self.button.configure(state=ctk.NORMAL)
@@ -1118,7 +1118,6 @@ class ReconX:
                             self.ports_tree.insert("", "end", values=(port,))
                             self.services_tree.insert("", "end", values=(f"{service}"))
                 
-                self.save_scan_results("ports", None)
                 self.progress_bar.stop()
                 self.progress_label.configure(text=f"Done! Found {len(open_ports)} open ports")
                 self.button.configure(state=ctk.NORMAL)
@@ -1167,14 +1166,13 @@ class ReconX:
                 r = s.get(f"https://{domain}", verify=False)
             for header, value in r.headers.items():
                 self.headers_tree.insert("", "end", values=(header, value))
-            self.save_scan_results("headers", None)
             self.progress_bar.stop()
             self.progress_label.configure(text="Done!")
             self.button.configure(state=ctk.NORMAL)
             self.clear_button.configure(state=ctk.NORMAL)
         except Exception as e:
             self.progress_bar.stop()
-            self.progress_label.configure(text="Error")
+            self.progress_label.configure(text=f"Error: {e}")
             self.button.configure(state=ctk.NORMAL)
             self.clear_button.configure(state=ctk.NORMAL)
 
@@ -1291,7 +1289,7 @@ class ReconX:
                 self.progress_label.configure(
                     text=f"Done! Found {len(self.subdomain_tree.get_children())} subdomains"
                 )
-                self.save_scan_results("subdomains", None)
+                
                 self.button.configure(state=ctk.NORMAL)
                 self.clear_button.configure(state=ctk.NORMAL)
     
@@ -1354,59 +1352,111 @@ class ReconX:
     def shodan_thread(self):
         threading.Thread(target=self.shodan).start()
 
-    def save_scan_results(self, scan_type, results):
-        """Save scan results to a file if checkbox is checked"""
-        if not self.save_results_var.get():
-            return
-            
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        domain = self.entry.get().replace("https://", "").replace("http://", "").replace("/", "_")
-        filename = f"results/{domain}_{scan_type}_{timestamp}.txt"
-        
-        # Create results directory if it doesn't exist
-        os.makedirs("results", exist_ok=True)
-        
+
+    def save_current_results(self):
+        """Save the current results based on the active tab"""
         try:
-            with open(filename, "w") as f:
-                if scan_type == "subdomains":
-                    for item in self.subdomain_tree.get_children():
-                        values = self.subdomain_tree.item(item)["values"]
-                        f.write(f"Domain: {values[0]}, Status: {values[1]}, IP: {values[2]}, Server: {values[3]}\n")
-                
-                elif scan_type == "ports":
-                    for item in self.ports_tree.get_children():
-                        port = self.ports_tree.item(item)["values"][0]
-                        f.write(f"Open Port: {port}\n")
-                    
-                elif scan_type == "asn":
-                    for item in self.asn_tree.get_children():
-                        values = self.asn_tree.item(item)["values"]
-                        f.write(f"{values[0]}: {values[1]}\n")
-                
-                elif scan_type == "headers":
-                    for item in self.headers_tree.get_children():
-                        values = self.headers_tree.item(item)["values"]
-                        f.write(f"{values[0]}: {values[1]}\n")
-                
-                elif scan_type == "javascript":
-                    for item in self.javascript_tree.get_children():
-                        values = self.javascript_tree.item(item)["values"]
-                        f.write(f"File: {values[0]}, Status: {values[1]}\n")
-                
-                elif scan_type == "links":
-                    for item in self.links_tree.get_children():
-                        link = self.links_tree.item(item)["values"][0]
-                        f.write(f"{link}\n")
-                
-                elif scan_type == "whois":
-                    for item in self.whois_tree.get_children():
-                        values = self.whois_tree.item(item)["values"]
-                        f.write(f"{values[0]}: {values[1]}\n")
-                        
-            print(f"Results saved to {filename}")
+            # Get current active tab
+            current_tab = self.menu.get()
             
+            # Create results directory if it doesn't exist
+            os.makedirs("results", exist_ok=True)
+            
+            # Initialize empty results list
+            results = []
+            
+            # Collect results based on current tab
+            if current_tab == "Shodan":
+                scan_type = "shodan"
+                for item in self.shodan_tree.get_children():
+                    values = self.shodan_tree.item(item)["values"]
+                    result = {
+                        'ip': values[0],
+                        'org': values[1],
+                        'ports': values[2],
+                        'hostnames': values[3],
+                        'os': values[4],
+                        'vulns': values[5] if len(values) > 5 else 'N/A'
+                    }
+                    results.append(result)
+                    
+            elif current_tab == "Subdomain":
+                scan_type = "subdomains"
+                for item in self.subdomain_tree.get_children():
+                    values = self.subdomain_tree.item(item)["values"]
+                    result = {
+                        'domain': values[0],
+                        'status': values[1],
+                        'ip': values[2],
+                        'server': values[3]
+                    }
+                    results.append(result)
+                    
+            elif current_tab == "Port Scan":
+                scan_type = "ports"
+                for item in self.ports_tree.get_children():
+                    port = self.ports_tree.item(item)["values"][0]
+                    result = {'port': port}
+                    results.append(result)
+                    
+            elif current_tab == "ASN":
+                scan_type = "asn"
+                for item in self.asn_tree.get_children():
+                    values = self.asn_tree.item(item)["values"]
+                    result = {
+                        'asn': values[0],
+                        'organization': values[1]
+                    }
+                    results.append(result)
+                    
+            elif current_tab == "Headers":
+                scan_type = "headers"
+                for item in self.headers_tree.get_children():
+                    values = self.headers_tree.item(item)["values"]
+                    result = {
+                        'header_name': values[0],
+                        'header_value': values[1]
+                    }
+                    results.append(result)
+                    
+            elif current_tab == "JavaScript":
+                scan_type = "javascript"
+                for item in self.javascript_tree.get_children():
+                    values = self.javascript_tree.item(item)["values"]
+                    result = {
+                        'file': values[0],
+                        'status': values[1]
+                    }
+                    results.append(result)
+                    
+            elif current_tab == "Links":
+                scan_type = "links"
+                for item in self.links_tree.get_children():
+                    link = self.links_tree.item(item)["values"][0]
+                    result = {'link': link}
+                    results.append(result)
+                    
+            else:
+                messagebox.showerror("Error", f"Save functionality not implemented for {current_tab} tab.")
+                return
+                
+            # Save the results
+            if results:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                target = self.entry.get().replace("https://", "").replace("http://", "").replace("/", "_")
+                filename = f"results/{target}_{scan_type}_{timestamp}.txt"
+                
+                with open(filename, "w") as f:
+                    for result in results:
+                        f.write(json.dumps(result, indent=2) + "\n")
+                        f.write("-" * 50 + "\n")
+                        
+                messagebox.showinfo("Success", f"Results saved to {filename}")
+            else:
+                messagebox.showwarning("Warning", "No results to save")
+                
         except Exception as e:
-            print(f"Error saving results: {e}")
+            messagebox.showerror("Error", f"Failed to save results: {str(e)}")
 
 
 if __name__ == "__main__":
