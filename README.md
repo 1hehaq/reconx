@@ -1,5 +1,5 @@
 <div align="center">
-   <a href="https://github.com/gotr00t0day/Reconnaissance/reconx.png"><img src="https://github.com/gotr00t0day/Reconnaissance/blob/main/reconx.png" width="500" height="500" align="center"/></a>
+   <a href="https://github.com/gotr00t0day/Reconnaissance/reconx.png"><img src="https://github.com/gotr00t0day/Reconnaissance/blob/main/reconx.png" width="575" height="500" align="center"/></a>
 </div>
 
 <br>
