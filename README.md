@@ -27,6 +27,13 @@
 <br>
 <br>
 
+> [!Note]
+> **_Currently on build phase! new features will come soon.. ![`notification`](https://github.com/user-attachments/assets/a973b3e9-deb8-42b7-93e0-85f586f07c36) [**`Enable`**](https://github.com/gotr00t0day/Reconnaissance/subscription) notification for upcoming updates_**
+
+<br>
+<br>
+
+
 <div align="center">
   
 | Features                          | About                                                                       |
